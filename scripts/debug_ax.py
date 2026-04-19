@@ -1,9 +1,8 @@
-"""Verify our raw AX tree call works where zendriver's parsed one does not."""
+"""Inspect AX node relationships."""
 
 from __future__ import annotations
 
 import asyncio
-import time
 
 import zendriver as zd
 
@@ -16,14 +15,19 @@ async def main() -> None:
         tab = await browser.get("https://example.com")
         await asyncio.sleep(0.5)
 
-        print("Raw Accessibility.getFullAXTree...")
-        t0 = time.perf_counter()
-        raw = await asyncio.wait_for(tab.send(_raw_get_full_ax_tree()), timeout=10)
-        elapsed = time.perf_counter() - t0
-        print(f"  {len(raw)} raw nodes in {elapsed:.2f}s")
-
-        roles = {n.get("role", {}).get("value") for n in raw if n.get("role")}
-        print(f"  unique roles: {sorted(r for r in roles if r)}")
+        raw = await tab.send(_raw_get_full_ax_tree())
+        print(f"Total: {len(raw)}")
+        for n in raw:
+            nid = n.get("nodeId")
+            role = (n.get("role") or {}).get("value")
+            name = (n.get("name") or {}).get("value")
+            parent = n.get("parentId")
+            kids = n.get("childIds") or []
+            ignored = n.get("ignored")
+            print(
+                f"  id={nid} role={role!r} name={name!r:40.40} parent={parent} "
+                f"childIds={kids} ignored={ignored}"
+            )
     finally:
         await browser.stop()
 

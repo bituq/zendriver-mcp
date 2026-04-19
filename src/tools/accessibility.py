@@ -81,8 +81,9 @@ class AccessibilityTools(ToolBase):
         ``click_by_uid`` for deterministic interaction.
 
         - ``max_nodes``: cap the node count to keep the response small.
-        - ``interesting_only``: drop nodes with empty role+name and no
-          interactive properties.
+        - ``interesting_only``: skip ignored/structural nodes (``none``,
+          ``generic``, ``InlineTextBox``, ``StaticText``) while keeping
+          their children, so the tree stays compact without losing content.
         """
         tab = self.session.page
         await tab.send(cdp.accessibility.enable())
@@ -92,6 +93,9 @@ class AccessibilityTools(ToolBase):
         by_id: dict[str, dict[str, Any]] = {
             str(node.get("nodeId")): node for node in raw_nodes if node.get("nodeId") is not None
         }
+
+        # The root is the node without a parent, not necessarily raw_nodes[0].
+        roots = [n for n in raw_nodes if n.get("parentId") in (None, "")]
 
         interactive_roles = {
             "button",
@@ -103,60 +107,75 @@ class AccessibilityTools(ToolBase):
             "switch",
             "combobox",
             "menuitem",
+            "menuitemcheckbox",
+            "menuitemradio",
             "tab",
             "option",
+            "treeitem",
+        }
+        noise_roles = {
+            "none",
+            "generic",
+            "presentation",
+            "InlineTextBox",
+            "StaticText",
         }
 
-        def render(node: dict[str, Any]) -> dict[str, Any] | None:
-            if len(self._uids) >= max_nodes:
-                return None
+        def render(node: dict[str, Any]) -> list[dict[str, Any]]:
+            """Return a list of rendered children for ``node``.
 
+            A list (not a single dict) makes it trivial to flatten skipped
+            wrapper nodes: we just concatenate their children into the
+            parent's list.
+            """
             role = _string_value(node.get("role"))
             name = _string_value(node.get("name"))
             ignored = bool(node.get("ignored"))
             backend_id = int(node.get("backendDOMNodeId") or 0)
             child_ids = node.get("childIds") or []
 
-            if interesting_only and not role and not name:
-                # Dive through invisible wrappers without emitting a uid for them.
-                collected: list[dict[str, Any]] = []
-                for cid in child_ids:
-                    child = by_id.get(str(cid))
-                    if child is None:
-                        continue
-                    r = render(child)
-                    if r is not None:
-                        collected.append(r)
-                return (
-                    {"uid": "", "role": "", "name": "", "children": collected}
-                    if collected
-                    else None
-                )
-
-            if ignored and role not in interactive_roles:
-                return None
-
-            uid = f"ax_{uuid4().hex[:8]}"
-            self._uids[uid] = _UidEntry(backend_node_id=backend_id, role=role, name=name)
-            rendered: dict[str, Any] = {"uid": uid, "role": role, "name": name}
-            children: list[dict[str, Any]] = []
+            rendered_children: list[dict[str, Any]] = []
             for cid in child_ids:
                 child = by_id.get(str(cid))
                 if child is None:
                     continue
-                r = render(child)
-                if r is not None:
-                    children.append(r)
-            if children:
-                rendered["children"] = children
-            return rendered
+                rendered_children.extend(render(child))
 
-        if not raw_nodes:
+            skip = False
+            if interesting_only:
+                is_interactive = role in interactive_roles
+                if not is_interactive:
+                    if ignored or role in noise_roles:
+                        skip = True
+                    elif not role and not name:
+                        skip = True
+
+            if skip:
+                # Don't emit ourselves, bubble children up instead.
+                return rendered_children
+
+            if len(self._uids) >= max_nodes:
+                return rendered_children
+
+            uid = f"ax_{uuid4().hex[:8]}"
+            self._uids[uid] = _UidEntry(backend_node_id=backend_id, role=role, name=name)
+            entry: dict[str, Any] = {"uid": uid, "role": role, "name": name}
+            if rendered_children:
+                entry["children"] = rendered_children
+            return [entry]
+
+        if not roots:
             return ToolResponse(summary="Empty accessibility tree", data={"nodes": []}).to_dict()
-        root = render(raw_nodes[0]) or {}
+
+        top = render(roots[0])
+        # Wrap in a synthetic root if the real root got filtered out.
+        if len(top) == 1:
+            tree: dict[str, Any] = top[0]
+        else:
+            tree = {"uid": "", "role": "", "name": "", "children": top}
         return ToolResponse(
             summary=f"Accessibility snapshot: {len(self._uids)} nodes",
-            data={"tree": root, "uid_count": len(self._uids)},
+            data={"tree": tree, "uid_count": len(self._uids)},
         ).to_dict()
 
     async def describe_uid(self, uid: str) -> dict[str, Any]:
