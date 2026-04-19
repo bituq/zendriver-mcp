@@ -1,6 +1,13 @@
 # Browser session management for Zendriver MCP server.
 # Includes CDP event listeners for network and console logging.
 
+# Side-effect import: patches zendriver Transaction.__call__. Must run
+# before any CDP round-trip happens, otherwise any future Chrome enum
+# addition will silently hang the Listener task.
+# ruff: isort: off
+from src import compat  # noqa: F401, I001
+
+# ruff: isort: on
 from datetime import datetime
 from typing import Any
 

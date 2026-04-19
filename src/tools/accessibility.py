@@ -4,10 +4,19 @@ The DOM walker upstream returns numeric IDs based on DOM traversal order;
 they re-number on every tree mutation. For long interactive agent flows
 we also expose the CDP accessibility tree keyed by stable uids that stay
 valid as long as the underlying backend node still exists.
+
+Implementation note: we call ``Accessibility.getFullAXTree`` via a raw CDP
+generator that returns the response dict verbatim. Zendriver's bundled
+parser ships with a stale ``AXPropertyName`` enum and raises ``ValueError``
+on new Chrome values like ``uninteresting``; that exception is swallowed by
+the Listener task, which leaves the original future unresolved and the
+caller hanging until our timeout guard fires. Parsing the raw JSON here
+side-steps the issue entirely.
 """
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
@@ -25,6 +34,26 @@ class _UidEntry:
     backend_node_id: int
     role: str
     name: str
+
+
+def _raw_get_full_ax_tree(
+    depth: int | None = None,
+) -> Generator[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
+    """CDP generator that returns ``Accessibility.getFullAXTree`` raw nodes.
+
+    Drop-in replacement for ``cdp.accessibility.get_full_ax_tree()`` that
+    bypasses zendriver's ``AXNode.from_json`` (which raises on unknown
+    enum values). The connection driver hands us the response dict; we
+    return it unchanged so the caller can parse what it needs.
+    """
+    params: dict[str, Any] = {}
+    if depth is not None:
+        params["depth"] = depth
+    response: dict[str, Any] = yield {
+        "method": "Accessibility.getFullAXTree",
+        "params": params,
+    }
+    return list(response.get("nodes", []))
 
 
 class AccessibilityTools(ToolBase):
@@ -57,10 +86,12 @@ class AccessibilityTools(ToolBase):
         """
         tab = self.session.page
         await tab.send(cdp.accessibility.enable())
-        nodes = await tab.send(cdp.accessibility.get_full_ax_tree())
+        raw_nodes: list[dict[str, Any]] = await tab.send(_raw_get_full_ax_tree())
 
         self._uids.clear()
-        by_id: dict[str, cdp.accessibility.AXNode] = {str(n.node_id): n for n in nodes}
+        by_id: dict[str, dict[str, Any]] = {
+            str(node.get("nodeId")): node for node in raw_nodes if node.get("nodeId") is not None
+        }
 
         interactive_roles = {
             "button",
@@ -76,41 +107,40 @@ class AccessibilityTools(ToolBase):
             "option",
         }
 
-        def render(node: cdp.accessibility.AXNode) -> dict[str, Any] | None:
+        def render(node: dict[str, Any]) -> dict[str, Any] | None:
             if len(self._uids) >= max_nodes:
                 return None
-            role = str(node.role.value) if node.role and node.role.value else ""
-            name = str(node.name.value) if node.name and node.name.value else ""
+
+            role = _string_value(node.get("role"))
+            name = _string_value(node.get("name"))
+            ignored = bool(node.get("ignored"))
+            backend_id = int(node.get("backendDOMNodeId") or 0)
+            child_ids = node.get("childIds") or []
+
             if interesting_only and not role and not name:
-                children_rendered: list[dict[str, Any]] = []
-                for cid in node.child_ids or []:
+                # Dive through invisible wrappers without emitting a uid for them.
+                collected: list[dict[str, Any]] = []
+                for cid in child_ids:
                     child = by_id.get(str(cid))
                     if child is None:
                         continue
                     r = render(child)
                     if r is not None:
-                        children_rendered.append(r)
-                # Collapse: return children directly (skip invisible wrapper).
+                        collected.append(r)
                 return (
-                    {"uid": "", "role": "", "name": "", "children": children_rendered}
-                    if children_rendered
+                    {"uid": "", "role": "", "name": "", "children": collected}
+                    if collected
                     else None
                 )
 
-            if node.ignored and role not in interactive_roles:
+            if ignored and role not in interactive_roles:
                 return None
 
             uid = f"ax_{uuid4().hex[:8]}"
-            self._uids[uid] = _UidEntry(
-                backend_node_id=int(node.backend_dom_node_id)
-                if node.backend_dom_node_id is not None
-                else 0,
-                role=role,
-                name=name,
-            )
+            self._uids[uid] = _UidEntry(backend_node_id=backend_id, role=role, name=name)
             rendered: dict[str, Any] = {"uid": uid, "role": role, "name": name}
             children: list[dict[str, Any]] = []
-            for cid in node.child_ids or []:
+            for cid in child_ids:
                 child = by_id.get(str(cid))
                 if child is None:
                     continue
@@ -121,9 +151,9 @@ class AccessibilityTools(ToolBase):
                 rendered["children"] = children
             return rendered
 
-        if not nodes:
+        if not raw_nodes:
             return ToolResponse(summary="Empty accessibility tree", data={"nodes": []}).to_dict()
-        root = render(nodes[0]) or {}
+        root = render(raw_nodes[0]) or {}
         return ToolResponse(
             summary=f"Accessibility snapshot: {len(self._uids)} nodes",
             data={"tree": root, "uid_count": len(self._uids)},
@@ -163,11 +193,9 @@ class AccessibilityTools(ToolBase):
         if remote is None or remote.object_id is None:
             raise ElementNotFoundError(f"uid:{uid}")
 
-        # Scroll into view + get center, then native click via Input.dispatchMouseEvent.
         quads = await tab.send(cdp.dom.get_content_quads(object_id=remote.object_id))
         if not quads:
             raise AccessibilityUidError(f"uid {uid} has no visible content box")
-        # First quad = [x1, y1, x2, y2, x3, y3, x4, y4]
         q = quads[0]
         cx = (q[0] + q[2] + q[4] + q[6]) / 4
         cy = (q[1] + q[3] + q[5] + q[7]) / 4
@@ -190,3 +218,17 @@ class AccessibilityTools(ToolBase):
             )
         )
         return f"Clicked uid {uid} ({entry.role}: {entry.name[:40]})"
+
+
+def _string_value(ax_value: dict[str, Any] | None) -> str:
+    """Extract the stringified value from a raw ``AXValue`` dict.
+
+    The CDP ``AXValue`` shape is ``{"type": "...", "value": ...}``. We only
+    care about string-ish values here.
+    """
+    if not ax_value:
+        return ""
+    value = ax_value.get("value")
+    if value is None:
+        return ""
+    return str(value)
