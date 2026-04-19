@@ -12,7 +12,7 @@ def test_mcp_server_initialises() -> None:
 def test_expected_tool_count() -> None:
     # Guards against accidental tool removal; bump when we deliberately add tools.
     tools = mcp._tool_manager._tools
-    assert len(tools) >= 59, f"expected at least 59 tools registered, got {len(tools)}"
+    assert len(tools) >= 72, f"expected at least 72 tools registered, got {len(tools)}"
 
 
 def test_core_tools_registered() -> None:
@@ -34,6 +34,16 @@ def test_core_tools_registered() -> None:
         "set_geolocation",
         "human_click",
         "human_type",
+        "set_viewport",
+        "set_device",
+        "set_cpu_throttle",
+        "set_network_conditions",
+        "emulate_media",
+        "start_trace",
+        "stop_trace",
+        "take_heap_snapshot",
+        "run_lighthouse",
+        "check_lighthouse_available",
     }
     missing = must_have - tools.keys()
     assert not missing, f"missing core tools: {missing}"

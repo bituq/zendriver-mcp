@@ -4,9 +4,12 @@ from mcp.server.fastmcp import FastMCP
 from src.tools.base import ToolBase
 from src.tools.browser import BrowserTools
 from src.tools.content import ContentTools
+from src.tools.devtools import DevToolsTools
 from src.tools.elements import ElementTools
+from src.tools.emulation import EmulationTools
 from src.tools.forms import FormTools
 from src.tools.humanlike import HumanInputTools
+from src.tools.lighthouse import LighthouseTools
 from src.tools.logging import LoggingTools
 from src.tools.navigation import NavigationTools
 from src.tools.query import QueryTools
@@ -31,6 +34,9 @@ _form_tools = FormTools(mcp)
 _utility_tools = UtilityTools(mcp)
 _stealth_tools = StealthTools(mcp)
 _human_input_tools = HumanInputTools(mcp)
+_emulation_tools = EmulationTools(mcp)
+_devtools_tools = DevToolsTools(mcp)
+_lighthouse_tools = LighthouseTools(mcp)
 
 # export individual tool functions for backwards compatibility
 # browser lifecycle
@@ -116,6 +122,25 @@ human_click = _human_input_tools.human_click
 human_type = _human_input_tools.human_type
 estimated_typing_duration = _human_input_tools.estimated_typing_duration
 
+# emulation
+set_viewport = _emulation_tools.set_viewport
+restore_viewport = _emulation_tools.restore_viewport
+set_device = _emulation_tools.set_device
+list_devices = _emulation_tools.list_devices
+set_cpu_throttle = _emulation_tools.set_cpu_throttle
+set_network_conditions = _emulation_tools.set_network_conditions
+list_network_profiles = _emulation_tools.list_network_profiles
+emulate_media = _emulation_tools.emulate_media
+
+# devtools
+start_trace = _devtools_tools.start_trace
+stop_trace = _devtools_tools.stop_trace
+take_heap_snapshot = _devtools_tools.take_heap_snapshot
+
+# lighthouse
+run_lighthouse = _lighthouse_tools.run_lighthouse
+check_lighthouse_available = _lighthouse_tools.check_lighthouse_available
+
 __all__ = [
     # mcp server
     "mcp",
@@ -134,6 +159,9 @@ __all__ = [
     "UtilityTools",
     "StealthTools",
     "HumanInputTools",
+    "EmulationTools",
+    "DevToolsTools",
+    "LighthouseTools",
     # individual tool functions
     "start_browser",
     "stop_browser",
@@ -194,4 +222,17 @@ __all__ = [
     "human_click",
     "human_type",
     "estimated_typing_duration",
+    "set_viewport",
+    "restore_viewport",
+    "set_device",
+    "list_devices",
+    "set_cpu_throttle",
+    "set_network_conditions",
+    "list_network_profiles",
+    "emulate_media",
+    "start_trace",
+    "stop_trace",
+    "take_heap_snapshot",
+    "run_lighthouse",
+    "check_lighthouse_available",
 ]

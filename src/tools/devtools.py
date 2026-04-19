@@ -1,0 +1,163 @@
+"""DevTools-parity tools: performance traces, heap snapshots.
+
+These use the lower-level CDP event streams (``Tracing.dataCollected``,
+``HeapProfiler.addHeapSnapshotChunk``) rather than higher-level wrappers, so
+the captured data is byte-for-byte what Chrome DevTools would save.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import tempfile
+import time
+from pathlib import Path
+from typing import Any
+
+from zendriver import cdp
+
+from src.errors import ZendriverMCPError
+from src.tools.base import ToolBase
+
+# Roughly matches DevTools' default "Performance" trace profile.
+_DEFAULT_CATEGORIES = ",".join(
+    [
+        "devtools.timeline",
+        "v8.execute",
+        "disabled-by-default-devtools.timeline",
+        "disabled-by-default-devtools.timeline.frame",
+        "toplevel",
+        "blink.console",
+        "blink.user_timing",
+        "latencyInfo",
+        "disabled-by-default-v8.cpu_profiler",
+        "disabled-by-default-devtools.timeline.stack",
+    ]
+)
+
+
+class DevToolsTools(ToolBase):
+    """Performance trace recording and heap snapshot capture."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._trace_events: list[dict] | None = None
+        self._trace_complete: asyncio.Event | None = None
+
+    def _register_tools(self) -> None:
+        self._mcp.tool()(self.start_trace)
+        self._mcp.tool()(self.stop_trace)
+        self._mcp.tool()(self.take_heap_snapshot)
+
+    async def start_trace(self, categories: str = "") -> str:
+        """Begin recording a performance trace on the current tab.
+
+        ``categories`` is a comma-separated CDP category filter; empty string
+        uses the DevTools Performance-panel default profile. Only one trace
+        can be active per tool instance at a time.
+        """
+        if self._trace_events is not None:
+            return "Error: A trace is already in progress. Call stop_trace first."
+
+        events: list[dict] = []
+        complete = asyncio.Event()
+
+        async def on_data(event: cdp.tracing.DataCollected) -> None:
+            events.extend(event.value)
+
+        async def on_complete(_: cdp.tracing.TracingComplete) -> None:
+            complete.set()
+
+        tab = self.session.page
+        tab.add_handler(cdp.tracing.DataCollected, on_data)
+        tab.add_handler(cdp.tracing.TracingComplete, on_complete)
+
+        self._trace_events = events
+        self._trace_complete = complete
+        self._trace_handlers = (on_data, on_complete)
+
+        await tab.send(
+            cdp.tracing.start(
+                categories=categories or _DEFAULT_CATEGORIES,
+                transfer_mode="ReportEvents",
+            )
+        )
+        return "Trace started"
+
+    async def stop_trace(self, file_path: str = "") -> str:
+        """Stop the active trace and write it to disk as JSON.
+
+        Returns the absolute file path. If ``file_path`` is empty, writes to
+        a timestamped file in the system temp directory. The output matches
+        the format that Chrome DevTools' "Load profile" accepts.
+        """
+        if self._trace_events is None or self._trace_complete is None:
+            raise ZendriverMCPError("No trace in progress. Call start_trace first.")
+
+        tab = self.session.page
+        await tab.send(cdp.tracing.end())
+
+        try:
+            await asyncio.wait_for(self._trace_complete.wait(), timeout=30.0)
+        except TimeoutError as exc:
+            raise ZendriverMCPError("Trace did not complete within 30s") from exc
+
+        on_data, on_complete = self._trace_handlers
+        tab.handlers.get(cdp.tracing.DataCollected, []).remove(on_data)
+        tab.handlers.get(cdp.tracing.TracingComplete, []).remove(on_complete)
+
+        target = (
+            Path(file_path).expanduser().resolve()
+            if file_path
+            else Path(tempfile.gettempdir()) / f"zendriver-trace-{int(time.time())}.json"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({"traceEvents": self._trace_events}))
+
+        count = len(self._trace_events)
+        self._trace_events = None
+        self._trace_complete = None
+        return f"Trace saved: {target} ({count} events)"
+
+    async def take_heap_snapshot(self, file_path: str = "") -> str:
+        """Capture a V8 heap snapshot and write it to disk.
+
+        The output is the same ``.heapsnapshot`` format Chrome DevTools saves,
+        loadable via DevTools > Memory > Load.
+        """
+        tab = self.session.page
+
+        chunks: list[str] = []
+        finished = asyncio.Event()
+
+        async def on_chunk(event: cdp.heap_profiler.AddHeapSnapshotChunk) -> None:
+            chunks.append(event.chunk)
+
+        async def on_progress(event: cdp.heap_profiler.ReportHeapSnapshotProgress) -> None:
+            if event.finished:
+                finished.set()
+
+        tab.add_handler(cdp.heap_profiler.AddHeapSnapshotChunk, on_chunk)
+        tab.add_handler(cdp.heap_profiler.ReportHeapSnapshotProgress, on_progress)
+
+        try:
+            await tab.send(cdp.heap_profiler.enable())
+            await tab.send(cdp.heap_profiler.take_heap_snapshot(report_progress=True))
+            # Once take_heap_snapshot's RPC returns, chunks are all delivered.
+            # Wait briefly for the last progress ping if the backend emits one.
+            try:
+                await asyncio.wait_for(finished.wait(), timeout=2.0)
+            except TimeoutError:
+                pass  # some Chrome versions don't emit the final progress event
+        finally:
+            tab.handlers.get(cdp.heap_profiler.AddHeapSnapshotChunk, []).remove(on_chunk)
+            tab.handlers.get(cdp.heap_profiler.ReportHeapSnapshotProgress, []).remove(on_progress)
+
+        target = (
+            Path(file_path).expanduser().resolve()
+            if file_path
+            else Path(tempfile.gettempdir()) / f"zendriver-heap-{int(time.time())}.heapsnapshot"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("".join(chunks))
+        return f"Heap snapshot saved: {target} ({len(chunks)} chunks)"
