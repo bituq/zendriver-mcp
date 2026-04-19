@@ -23,3 +23,6 @@ dist/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Docs build
+site/

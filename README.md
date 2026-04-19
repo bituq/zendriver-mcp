@@ -174,12 +174,13 @@ Everything on the original roadmap shipped in the 0.2 / 0.3 releases:
 - [x] `ToolResponse` envelope adopted in rich-output tools
 - [x] PyPI publish workflow (Trusted Publishing)
 
+Documentation site: **<https://bituq.github.io/zendriver-mcp/>**
+
 What's next is driven by actual usage. Ideas on deck:
 
 - Per-request proxy routing via Fetch interception
 - Binary body support in `mock_response`
 - `Fetch.enable` with patterns (faster than our "match all then filter")
-- Docs site hosted from `/docs/`
 
 ## License
 

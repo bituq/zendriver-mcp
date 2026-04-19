@@ -1,0 +1,79 @@
+site_name: zendriver-mcp
+site_description: Undetectable browser automation for LLM agents, spoken over MCP.
+site_url: https://bituq.github.io/zendriver-mcp/
+repo_url: https://github.com/bituq/zendriver-mcp
+repo_name: bituq/zendriver-mcp
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Match system
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: Light mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: Dark mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+    - search.suggest
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Tool reference: tool-reference.md
+  - Recipes:
+      - Scrape behind login: recipes/scrape-behind-login.md
+      - Beat Cloudflare: recipes/beat-cloudflare.md
+      - Performance audit: recipes/performance-audit.md
+      - Mock API responses: recipes/mock-api-responses.md
+  - Releasing: releasing.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/bituq/zendriver-mcp
