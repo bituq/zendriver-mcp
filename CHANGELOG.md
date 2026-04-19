@@ -6,6 +6,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+- `click(text=...)`, `click_shadow`, `describe_shadow`,
+  `human_click(text=...)`, `find_buttons` and `find_inputs` no longer
+  throw `SyntaxError: Illegal return statement`. The shadow-DOM JS
+  snippets were concatenated with a bare top-level `return`, which CDP
+  `Runtime.evaluate` rejects. They now end on a plain expression whose
+  completion value is what the tool reads.
+- `check_visibility` also flags zero-size bounding rects as hidden.
+  Pages like Outlook render multiple `[role="searchbox"]` elements; the
+  hidden ones have `display: block` but a 0x0 rect. Accepting those as
+  visible caused `click` to "succeed" without moving focus and
+  `type_text` to silently route keystrokes into whichever element
+  happened to hold focus.
+- `type_text` now propagates click errors (hidden element, 0x0 rect,
+  missing selector) instead of pretending success and then dispatching
+  `Input.insertText` into the wrong element.
+
 ## [0.3.3] - 2026-04-19
 
 ### Added
