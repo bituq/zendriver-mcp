@@ -59,11 +59,13 @@ class ElementTools(ToolBase):
             import json as _json
 
             safe_text = _json.dumps(text)
-            # Drop ``return`` - a bare top-level return is a SyntaxError in
-            # CDP Runtime.evaluate. The completion value of the final
-            # expression statement is what we want back.
+            # Wrap in an IIFE so (a) ``return`` is legal and (b) the
+            # ``const CLICKABLE_ROLES`` inside FIND_INNER_CLICKABLE_JS
+            # doesn't leak into the global lexical env of the execution
+            # context - which would raise "CLICKABLE_ROLES has already
+            # been declared" on the second call in the same session.
             result = await self.run_js(
-                CLICK_BY_TEXT_SHADOW_JS + f"\nclickByTextShadow({safe_text})\n"
+                f"(() => {{\n{CLICK_BY_TEXT_SHADOW_JS}\nreturn clickByTextShadow({safe_text});\n}})()"
             )
             if not isinstance(result, dict) or not result.get("ok"):
                 raise ElementNotFoundError(f"text={text!r}")
@@ -92,7 +94,7 @@ class ElementTools(ToolBase):
         selector = self.resolve_selector(selector)
         safe_sel = _json.dumps(selector)
         result = await self.run_js(
-            CLICK_SHADOW_HOST_JS + f"\nclickShadowHost({safe_sel}, {int(max_depth)})\n"
+            f"(() => {{\n{CLICK_SHADOW_HOST_JS}\nreturn clickShadowHost({safe_sel}, {int(max_depth)});\n}})()"
         )
         if not isinstance(result, dict) or not result.get("ok"):
             reason = result.get("reason") if isinstance(result, dict) else "unknown"
@@ -120,7 +122,7 @@ class ElementTools(ToolBase):
         selector = self.resolve_selector(selector)
         safe_sel = _json.dumps(selector)
         result = await self.run_js(
-            DESCRIBE_SHADOW_JS + f"\ndescribeShadow({safe_sel}, {int(max_depth)})\n"
+            f"(() => {{\n{DESCRIBE_SHADOW_JS}\nreturn describeShadow({safe_sel}, {int(max_depth)});\n}})()"
         )
         if not isinstance(result, dict) or not result.get("ok"):
             raise ElementNotFoundError(selector)
