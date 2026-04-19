@@ -6,6 +6,32 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-04-19
+
+### Added
+- `describe_shadow(selector, max_depth=6)` tool dumps a custom
+  element's nested shadow-DOM tree as condensed JSON (tag/id/role/
+  type/text per node, ``light`` + ``shadow`` child arrays). Replaces
+  the pattern where agents hand-roll recursive ``execute_js`` calls to
+  find which shadow-path leads to a control.
+
+### Fixed
+- `human_click(text=...)` is now shadow-aware: the walker finds the
+  tightest interactive element matching the text (descending into
+  nested shadowRoots when needed) and reads its composed viewport
+  rect, so the bezier mouse path lands on the real inner button or
+  ``[role="radio"]`` of a ``<nes-button>``/``<nes-selectable-radio>``
+  rather than on empty space next to the host. Fixes the false-
+  positive "Human-clicked" where the UI didn't actually react.
+- `find_inputs` now picks up custom elements whose tag suggests an
+  input (``*-input``, ``*-textarea``, ``*-field``, ``*-textbox``)
+  even when they are opacity-0 during hydration or live inside
+  another component's shadow root. The strict ``opacity === 0``
+  visibility filter was hiding ``<nes-ovpas-input>`` and similar
+  components immediately after navigation.
+
+Tool count: 97 -> 98.
+
 ## [0.3.2] - 2026-04-19
 
 ### Added

@@ -206,6 +206,98 @@ function clickShadowHost(hostSelector, maxDepth) {
 )
 
 
+# Shadow-aware coord lookup for human_click: find the same "tightest
+# interactive element" as clickByTextShadow but return its viewport
+# center instead of dispatching synthetic events. The human-input
+# pipeline then moves the cursor there with a bezier path and performs
+# a real CDP Input.dispatchMouseEvent click sequence.
+FIND_CLICK_COORDS_BY_TEXT_JS = (
+    WALK_ALL_JS
+    + FIND_INNER_CLICKABLE_JS
+    + """
+function findClickCoordsByText(target) {
+  const needle = (target || "").trim().toLowerCase();
+  if (!needle) return { ok: false, reason: "empty_text" };
+  const candidates = [];
+  walkAll(document, (el) => {
+    const text = (el.innerText || el.textContent || "").trim();
+    if (!text || !text.toLowerCase().includes(needle)) return;
+    candidates.push(el);
+  });
+  if (candidates.length === 0) return { ok: false, reason: "no_match" };
+  candidates.sort((a, b) => (a.innerText || a.textContent || "").length - (b.innerText || b.textContent || "").length);
+
+  let pick = null;
+  for (const el of candidates) {
+    if (isClickableEl(el)) { pick = el; break; }
+    let p = el.parentNode;
+    while (p) {
+      if (p.host) p = p.host;
+      if (p && p.nodeType === 1 && isClickableEl(p)) { pick = p; break; }
+      p = p && p.parentNode;
+    }
+    if (pick) break;
+  }
+  if (!pick) pick = candidates[0];
+
+  // Dive into shadow DOM for the real interactive leaf (e.g. the inner
+  // <button> of a <nes-button>). Coords come from that element's rect
+  // so the human-cursor path lands on the actual hit target.
+  const inner = findInnerClickable(pick, 5);
+  const targetEl = inner || pick;
+  try { targetEl.scrollIntoView({ block: "center" }); } catch (_) {}
+  const rect = targetEl.getBoundingClientRect();
+  if (!rect || (rect.width === 0 && rect.height === 0)) {
+    return { ok: false, reason: "no_rect", tag: targetEl.tagName };
+  }
+  return {
+    ok: true,
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+    tag: targetEl.tagName,
+    shadow: !!inner,
+    text: (targetEl.innerText || targetEl.textContent || "").trim().slice(0, 80),
+  };
+}
+"""
+)
+
+
+# Dump the nested shadow-DOM tree of a light-DOM element for debugging.
+# Returns a condensed JSON tree so agents don't have to hand-roll
+# recursive execute_js calls to find the right selector path.
+DESCRIBE_SHADOW_JS = """
+function describeShadow(hostSelector, maxDepth) {
+  const host = document.querySelector(hostSelector);
+  if (!host) return { ok: false, reason: "host_not_found" };
+  const cap = maxDepth || 6;
+  function summary(el) {
+    const tag = el.tagName.toLowerCase();
+    const id = el.id || null;
+    const role = el.getAttribute ? el.getAttribute("role") : null;
+    const type = el.getAttribute ? el.getAttribute("type") : null;
+    const text = (el.innerText || el.textContent || "").trim().slice(0, 40);
+    return { tag, id, role, type, text };
+  }
+  function walk(el, depth) {
+    const node = summary(el);
+    node.light = [];
+    for (const child of Array.from(el.children || [])) {
+      if (depth <= 0) break;
+      node.light.push(walk(child, depth - 1));
+    }
+    if (el.shadowRoot && depth > 0) {
+      node.shadow = Array.from(el.shadowRoot.children || []).map(
+        (c) => walk(c, depth - 1),
+      );
+    }
+    return node;
+  }
+  return { ok: true, tree: walk(host, cap) };
+}
+"""
+
+
 # Used by shadow-aware find_buttons / find_inputs: collect every button-
 # or input-like element across light + shadow DOM and return a minimal
 # descriptor. The Python side formats the output.
@@ -258,8 +350,14 @@ function hostSelector(el) {
 function visible(el) {
   try {
     const cs = getComputedStyle(el);
-    if (cs.display === "none" || cs.visibility === "hidden") return false;
-    if (cs.opacity === "0") return false;
+    if (cs.display === "none") return false;
+    if (cs.visibility === "hidden") return false;
+    // NOTE: we intentionally do NOT reject opacity === "0". Custom
+    // elements are often set to opacity 0 during hydration (Stencil,
+    // Lit, Vue SFC's <transition>) and become visible milliseconds
+    // later. A strict opacity filter hides <nes-ovpas-input> and
+    // similar components from find_inputs / find_buttons right after
+    // navigation.
   } catch (_) {}
   return true;
 }
@@ -308,11 +406,19 @@ function collectInputs(filterType) {
       (el.getAttribute && (el.getAttribute("type") === "text"
         || el.getAttribute("data-input")
         || tag.includes("input")
-        || tag.includes("field")))
+        || tag.includes("field")
+        || tag.includes("textbox")
+        || tag.includes("textarea")))
     );
     const isTextboxRole = role === "textbox" || role === "searchbox" || role === "combobox";
     if (!(isInput || ce || isTextboxRole || customInput)) return;
-    if (el.getRootNode && el.getRootNode().host) return;
+    // Skip elements that live INSIDE another shadow root UNLESS they are
+    // themselves a custom element host that happens to be shadow-nested.
+    // A vanilla <input> inside a shadow root can't be selected via
+    // document.querySelector, so skip those; but nested custom-element
+    // hosts (like <nes-ovpas-input> inside another component's shadow)
+    // are still callable via click_shadow with a chained host path.
+    if (el.getRootNode && el.getRootNode().host && !tag.includes("-")) return;
     if (!visible(el)) return;
     if (el.type === "hidden") return;
     seen.add(el);

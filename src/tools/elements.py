@@ -3,7 +3,11 @@
 from zendriver import cdp
 
 from src.errors import ElementNotFoundError
-from src.tools._shadow_js import CLICK_BY_TEXT_SHADOW_JS, CLICK_SHADOW_HOST_JS
+from src.tools._shadow_js import (
+    CLICK_BY_TEXT_SHADOW_JS,
+    CLICK_SHADOW_HOST_JS,
+    DESCRIBE_SHADOW_JS,
+)
 from src.tools.base import ZENDRIVER_ID_ATTR, ToolBase
 
 
@@ -14,6 +18,7 @@ class ElementTools(ToolBase):
         """register element interaction tools"""
         self._register(self.click)
         self._register(self.click_shadow)
+        self._register(self.describe_shadow)
         self._register(self.type_text)
         self._register(self.clear_input)
         self._register(self.focus_element)
@@ -94,6 +99,28 @@ class ElementTools(ToolBase):
         role = result.get("role")
         role_info = f" role={role}" if role else ""
         return f"Shadow-clicked: <{tag}{role_info}> inside {selector}"
+
+    async def describe_shadow(self, selector: str, max_depth: int = 6) -> dict:
+        """Dump a custom element's nested shadow-DOM tree for debugging.
+
+        Returns a condensed JSON tree - each node has ``tag``, ``id``,
+        ``role``, ``type``, ``text``, a ``light`` array of light-DOM
+        children and a ``shadow`` array for the element's shadowRoot
+        children (when open). Use this when ``find_buttons`` /
+        ``find_inputs`` aren't surfacing a control you can see on the
+        page; the result tells you the exact nested-host path so you
+        can target ``click_shadow`` or chain custom queries.
+        """
+        import json as _json
+
+        selector = self.resolve_selector(selector)
+        safe_sel = _json.dumps(selector)
+        result = await self.run_js(
+            DESCRIBE_SHADOW_JS + f"\nreturn describeShadow({safe_sel}, {int(max_depth)});\n"
+        )
+        if not isinstance(result, dict) or not result.get("ok"):
+            raise ElementNotFoundError(selector)
+        return {"selector": selector, "tree": result["tree"]}
 
     async def type_text(self, text: str, selector: str, replace: bool = True) -> str:
         """Focus an element and type ``text`` via CDP Input.insertText.

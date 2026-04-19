@@ -6,12 +6,14 @@ wrapping the low-level primitives in ``src.humaninput``.
 
 from __future__ import annotations
 
+from src.errors import ElementNotFoundError
 from src.humaninput import (
     Point,
     human_click,
     human_type,
     keystroke_delays,
 )
+from src.tools._shadow_js import FIND_CLICK_COORDS_BY_TEXT_JS
 from src.tools.base import ToolBase
 
 
@@ -33,27 +35,44 @@ class HumanInputTools(ToolBase):
 
         Accepts a CSS selector, the numeric ID from ``get_interaction_tree``,
         or visible text. ``move_duration`` is how long the mouse takes to
-        reach the target (default 0.4s).
+        reach the target (default 0.4s). Text-mode is shadow-DOM aware:
+        the walker finds the tightest interactive element matching the
+        text (descending into nested shadowRoots when needed) and aims
+        the cursor at its composed viewport rect, so clicks land on the
+        real handler inside custom elements like ``<nes-button>``.
         """
         if selector:
             selector = self.resolve_selector(selector)
             elem = await self.get_element(selector)
-        elif text:
-            elem = await self.get_element_by_text(text)
-        else:
-            return "Error: Provide selector or text"
+            position = await elem.get_position()
+            if position is None:
+                return f"Error: Element '{selector}' has no visible position"
+            cx, cy = position.center
+            await human_click(
+                self.session.page,
+                target=Point(cx, cy),
+                move_duration=move_duration,
+            )
+            return f"Human-clicked: {selector}"
 
-        position = await elem.get_position()
-        if position is None:
-            return f"Error: Element '{selector or text}' has no visible position"
+        if text:
+            import json as _json
 
-        cx, cy = position.center
-        await human_click(
-            self.session.page,
-            target=Point(cx, cy),
-            move_duration=move_duration,
-        )
-        return f"Human-clicked: {selector or text}"
+            needle = _json.dumps(text)
+            result = await self.run_js(
+                FIND_CLICK_COORDS_BY_TEXT_JS + f"\nreturn findClickCoordsByText({needle});\n"
+            )
+            if not isinstance(result, dict) or not result.get("ok"):
+                raise ElementNotFoundError(f"text={text!r}")
+            await human_click(
+                self.session.page,
+                target=Point(result["x"], result["y"]),
+                move_duration=move_duration,
+            )
+            shadow_note = " (shadow)" if result.get("shadow") else ""
+            return f"Human-clicked: {text}{shadow_note} <{result['tag']}>"
+
+        return "Error: Provide selector or text"
 
     async def human_type(
         self,

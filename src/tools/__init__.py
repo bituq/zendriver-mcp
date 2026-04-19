@@ -74,6 +74,7 @@ close_tab = _tab_tools.close_tab
 # elements
 click = _element_tools.click
 click_shadow = _element_tools.click_shadow
+describe_shadow = _element_tools.describe_shadow
 type_text = _element_tools.type_text
 clear_input = _element_tools.clear_input
 focus_element = _element_tools.focus_element
@@ -237,6 +238,7 @@ __all__ = [
     "close_tab",
     "click",
     "click_shadow",
+    "describe_shadow",
     "type_text",
     "clear_input",
     "focus_element",
