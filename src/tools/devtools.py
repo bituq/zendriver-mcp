@@ -56,14 +56,10 @@ class DevToolsTools(ToolBase):
     """Performance trace recording and heap snapshot capture."""
 
     def __init__(self, mcp: FastMCP) -> None:
-        super().__init__(mcp)
         self._trace_events: list[dict] | None = None
         self._trace_complete: asyncio.Event | None = None
         self._trace_handlers: tuple[DataHandler, CompleteHandler] | None = None
-        # stop_browser wipes the browser; drop any in-flight trace state so
-        # the next start_trace can succeed instead of seeing "already in
-        # progress" from the dead session.
-        self._session.register_reset_callback(self._reset_state)
+        super().__init__(mcp)
 
     def _reset_state(self) -> None:
         self._trace_events = None

@@ -36,8 +36,7 @@ class HumanInputTools(ToolBase):
         reach the target (default 0.4s).
         """
         if selector:
-            if selector.isdigit():
-                selector = f'[data-zendriver-id="{selector}"]'
+            selector = self.resolve_selector(selector)
             elem = await self.get_element(selector)
         elif text:
             elem = await self.get_element_by_text(text)

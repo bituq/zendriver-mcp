@@ -29,14 +29,11 @@ class ScreencastTools(ToolBase):
     """Start/stop a screencast recording into a directory of frames."""
 
     def __init__(self, mcp: FastMCP) -> None:
-        super().__init__(mcp)
         self._frame_dir: Path | None = None
         self._frame_count = 0
         self._frame_format = "jpeg"
         self._handler: FrameHandler | None = None
-        # When the browser dies mid-recording, drop the handles so the next
-        # start_screencast doesn't raise "already running" on a ghost session.
-        self._session.register_reset_callback(self._reset_state)
+        super().__init__(mcp)
 
     def _reset_state(self) -> None:
         self._frame_dir = None

@@ -60,11 +60,10 @@ class AccessibilityTools(ToolBase):
     """Accessibility-tree snapshots with stable, re-usable uids."""
 
     def __init__(self, mcp: FastMCP) -> None:
-        super().__init__(mcp)
         # Uid -> metadata. Cleared on session reset so old backendDOMNodeIds
         # from a dead browser don't map to random nodes in the new session.
         self._uids: dict[str, _UidEntry] = {}
-        self._session.register_reset_callback(self._reset_state)
+        super().__init__(mcp)
 
     def _reset_state(self) -> None:
         self._uids.clear()

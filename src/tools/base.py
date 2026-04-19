@@ -25,6 +25,9 @@ def _default_timeout() -> float:
 
 DEFAULT_TOOL_TIMEOUT = _default_timeout()
 
+# Must match ``ATTR`` in src/static/js/dom_walker.js.
+ZENDRIVER_ID_ATTR = "data-zendriver-id"
+
 
 class ToolBase(ABC):
     """base class providing shared functionality for all tool modules"""
@@ -32,7 +35,27 @@ class ToolBase(ABC):
     def __init__(self, mcp: FastMCP):
         self._mcp = mcp
         self._session = BrowserSession.get_instance()
+        # Auto-register the tool's session-reset hook if it defines one.
+        # Stateful tools (interception rules, trace buffers, screencast
+        # handles, accessibility uid caches) implement ``_reset_state``;
+        # this saves every such subclass from repeating the registration.
+        reset = getattr(self, "_reset_state", None)
+        if callable(reset):
+            self._session.register_reset_callback(reset)
         self._register_tools()
+
+    @staticmethod
+    def resolve_selector(selector: str) -> str:
+        """Turn a numeric id from ``get_interaction_tree`` into a CSS selector.
+
+        The DOM walker tags interactive elements with ``data-zendriver-id``;
+        tools accept either a real CSS selector or that numeric id. This
+        helper centralises the conversion so every tool treats them the
+        same way.
+        """
+        if selector.isdigit():
+            return f'[{ZENDRIVER_ID_ATTR}="{selector}"]'
+        return selector
 
     @abstractmethod
     def _register_tools(self) -> None:

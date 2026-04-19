@@ -51,14 +51,12 @@ class InterceptionTools(ToolBase):
     """Mock or fail outgoing requests matching URL patterns."""
 
     def __init__(self, mcp: FastMCP) -> None:
-        super().__init__(mcp)
         self._rules: list[_Rule] = []
         self._handler: PausedHandler | None = None
         self._lock = asyncio.Lock()
         self._next_id = 0
-        # Session resets wipe our per-browser state so the next start_browser
-        # starts clean instead of silently no-op'ing interception.
-        self._session.register_reset_callback(self._reset_state)
+        # ToolBase.__init__ auto-registers the reset callback below.
+        super().__init__(mcp)
 
     def _reset_state(self) -> None:
         self._rules = []
