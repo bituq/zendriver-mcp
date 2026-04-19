@@ -6,6 +6,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-19
+
+### Added
+- `server.json` + ``mcp-name`` README marker so the package can register
+  on the [MCP Registry](https://registry.modelcontextprotocol.io/).
+- Publish workflow now chains a ``mcp-registry`` job after PyPI upload,
+  using GitHub OIDC to authenticate ``mcp-publisher``.
+- README / ``docs/getting-started.md`` switched to ``uvx zendriver-mcp``
+  as the first-class install path (keeping the development-checkout
+  recipe available).
+
 ## [0.3.0] - 2026-04-19
 
 ### Added - round 2 audit follow-up

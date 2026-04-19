@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.bituq/zendriver-mcp",
+  "title": "Zendriver MCP",
+  "description": "Undetectable browser automation for LLM agents, spoken over MCP.",
+  "websiteUrl": "https://bituq.github.io/zendriver-mcp/",
+  "repository": {
+    "url": "https://github.com/bituq/zendriver-mcp",
+    "source": "github"
+  },
+  "version": "0.3.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "zendriver-mcp",
+      "version": "0.3.1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

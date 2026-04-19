@@ -1,5 +1,7 @@
 # zendriver-mcp
 
+<!-- mcp-name: io.github.bituq/zendriver-mcp -->
+
 **Undetectable browser automation for LLM agents, spoken over MCP.**
 
 `zendriver-mcp` is an [MCP](https://modelcontextprotocol.io) server that gives
@@ -69,12 +71,18 @@ by the MCP handshake.
 
 ## Install
 
-Requires Python 3.10+ (we pin 3.12) and [`uv`](https://docs.astral.sh/uv/).
+Published on PyPI: <https://pypi.org/project/zendriver-mcp/>.
+
+Requires Python 3.10+ and a Chrome / Chromium install.
 
 ```sh
-git clone https://github.com/bituq/zendriver-mcp.git
-cd zendriver-mcp
-uv sync
+# Zero-setup, re-resolves on every run - great for Claude Desktop configs
+uvx zendriver-mcp
+
+# Or install once, invoke many
+uv tool install zendriver-mcp
+pipx install zendriver-mcp
+pip install zendriver-mcp
 ```
 
 ## Use with Claude Desktop / Claude Code
@@ -83,13 +91,28 @@ uv sync
 {
   "mcpServers": {
     "zendriver": {
+      "command": "uvx",
+      "args": ["zendriver-mcp"]
+    }
+  }
+}
+```
+
+No clone, no `--directory`, no absolute path. If you prefer a permanent
+install instead, swap ``"command": "uvx"`` for ``"command": "zendriver-mcp"``
+after running ``uv tool install zendriver-mcp``.
+
+### Development checkout
+
+Working on `zendriver-mcp` itself? Clone + `uv sync`, then point your MCP
+client at the checkout:
+
+```json
+{
+  "mcpServers": {
+    "zendriver": {
       "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/zendriver-mcp",
-        "run",
-        "zendriver-mcp"
-      ]
+      "args": ["--directory", "/absolute/path/to/zendriver-mcp", "run", "zendriver-mcp"]
     }
   }
 }

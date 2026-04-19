@@ -2,17 +2,22 @@
 
 ## Install
 
-Prereqs: Python 3.10+, [`uv`](https://docs.astral.sh/uv/), and Chrome or
-Chromium somewhere on the system.
+Prereqs: Python 3.10+ and a Chrome / Chromium install. Pick one:
 
 ```sh
+# Zero-setup, resolves the latest release every run
+uvx zendriver-mcp
+
+# Install once, invoke many
+uv tool install zendriver-mcp
+pipx install zendriver-mcp
+pip install zendriver-mcp
+
+# Working on the server itself? Clone + sync
 git clone https://github.com/bituq/zendriver-mcp.git
 cd zendriver-mcp
 uv sync
 ```
-
-That's it for the server side - `uv sync` installs everything including
-Zendriver.
 
 ## Hooking it up to an MCP client
 
@@ -25,19 +30,16 @@ Edit `claude_desktop_config.json` (Desktop) or `~/.claude.json`
 {
   "mcpServers": {
     "zendriver": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/zendriver-mcp",
-        "run",
-        "zendriver-mcp"
-      ]
+      "command": "uvx",
+      "args": ["zendriver-mcp"]
     }
   }
 }
 ```
 
-Restart the client. You should see ~88 `zendriver__*` tools in the tool list.
+Restart the client. You should see ~96 `zendriver__*` tools in the tool
+list. Swap ``"command": "uvx"`` for ``"command": "zendriver-mcp"`` if you
+prefer a permanent install via ``uv tool install zendriver-mcp``.
 
 ### Other MCP clients
 

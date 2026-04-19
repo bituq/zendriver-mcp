@@ -1,4 +1,4 @@
-name: Publish to PyPI
+name: Publish to PyPI + MCP Registry
 
 on:
   push:
@@ -46,3 +46,31 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  mcp-registry:
+    needs: publish
+    runs-on: ubuntu-latest
+    # OIDC token used by mcp-publisher to prove we own io.github.bituq/*.
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mcp-publisher
+        run: |
+          curl -sSL \
+            "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" \
+            | tar xz mcp-publisher
+
+      - name: Sync server.json version with tag
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          python3 -c "import json,pathlib; p=pathlib.Path('server.json'); d=json.loads(p.read_text()); d['version']='$VERSION'; d['packages'][0]['version']='$VERSION'; p.write_text(json.dumps(d, indent=2))"
+          cat server.json
+
+      - name: Authenticate to MCP Registry via OIDC
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish
