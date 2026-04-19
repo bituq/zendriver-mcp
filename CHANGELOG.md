@@ -6,6 +6,64 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-19
+
+### Added - round 2 audit follow-up
+- **Path sandbox** (`src/artifacts.py`): every file-writing tool now
+  rejects paths outside ``$HOME`` / the system temp dir /
+  ``$ZENDRIVER_MCP_ARTIFACT_ROOT``. No more `/etc/passwd` overwrites.
+  Applies to `export_cookies`, `stop_trace`, `take_heap_snapshot`,
+  `screenshot`, `start_screencast`, `export_screencast_mp4`,
+  `run_lighthouse`.
+- `export_cookies` writes with ``chmod 0o600`` so session tokens aren't
+  world-readable.
+- `mock_response` rejects request bodies larger than 10 MiB.
+- `ToolBase.resolve_selector` + `ZENDRIVER_ID_ATTR` constant dedupe the
+  numeric-id-to-CSS-selector pattern across elements / humanlike.
+- `ToolBase.__init__` auto-registers `_reset_state` callbacks, so new
+  stateful tools can't forget the session-cleanup hook.
+- `tests/conftest.py` with an autouse `reset_browser_session` fixture +
+  `fresh_session` / `stub_mcp` fixtures.
+
+### Fixed - round 2
+- `press_key(" ")` (and `Space`) now actually inserts a space. The
+  metadata branch skipped `text=`, so the key event fired but no
+  character ever landed in the input.
+- `type_text(replace=True)` no longer double-clicks the target; the
+  redundant post-clear click was toggling date-pickers / checkboxes off.
+- `fill_form` catches `json.JSONDecodeError` and raises the typed
+  `ZendriverMCPError` instead of leaking an untyped traceback.
+- `press_key` uses the correct CDP ``code`` for digits and punctuation
+  (`Digit1`, `Minus`, `Semicolon`, ...).
+- Interception race: `on_paused` captures the tab reference *inside*
+  `self._lock` and exits cleanly if `stop_browser` ran mid-handler;
+  previously a paused request could stay stuck in Chrome indefinitely.
+- Screencast straggler-frame: `stop_screencast` clears `_frame_dir`
+  before the drain sleep, so a late `screencastFrame` event no longer
+  raises `AssertionError` from the Listener task.
+- `compat._safe_transaction_call` guards against `EventTransaction`
+  instances whose `__cdp_obj__` is None.
+- `get_accessibility_snapshot` now renders every top-level AX root
+  instead of silently dropping all but the first (iframes / OOPIF
+  embedded content).
+- `get_page_info` reads `document.title` via `page.evaluate` so the
+  response is always a real string, never a bound-method repr.
+- `clear_user_agent` queries `Browser.getVersion` and restores the
+  real UA; empty string was leaving a *more* fingerprintable client.
+- Dropped stray `--chrome-flags=--headless=false` from the Lighthouse
+  invocation.
+
+### Regression tests added
+- `test_artifacts_sandbox.py` - path sandbox allow/deny paths.
+- `test_forms_press_key.py` - VK metadata carries `text`, single-char
+  code mapping.
+- `test_escape_js.py` - table-driven JS-escape coverage.
+- `test_accessibility_uid_stability.py` - uid reuse across snapshots.
+
+Tool count still 96. Test count: 42 → 75.
+
+## [0.2.0] - 2026-04-19
+
 ### Fixed
 
 **Tool timeouts prevent session-killing hangs**
@@ -97,9 +155,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 Tool count: 88 -> 96. Test count: 24 -> 38.
 
-## [0.2.0] - 2026-04-19
-
-### Added
+### Added - initial fork shape
 
 **Housekeeping**
 - `uv` project layout, pinned to Python 3.12.
