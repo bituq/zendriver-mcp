@@ -153,15 +153,31 @@ class ToolBase(ABC):
         return await self._session.page.evaluate(script)
 
     async def check_visibility(self, selector: str) -> dict:
-        """check if element exists and is visible"""
+        """check if element exists and is visible
+
+        Also treats a zero-size bounding rect as hidden. Outlook and
+        similar SPAs render several ``[role="searchbox"]`` elements in
+        the DOM - only one of them has an actual rect, the others are
+        display: block with 0x0 dimensions. Accepting those as visible
+        caused ``click`` to silently "succeed" while focus stayed where
+        it was, and ``type_text`` routed keystrokes to whichever other
+        element held focus.
+        """
         safe_sel = self.escape_js_string(selector)
         return await self.run_js(f'''
             (function() {{
                 const el = document.querySelector("{safe_sel}");
                 if (!el) return {{ found: false }};
                 const style = window.getComputedStyle(el);
-                const hidden = style.display === "none" || style.visibility === "hidden";
-                return {{ found: true, hidden: hidden, tag: el.tagName }};
+                const rect = el.getBoundingClientRect();
+                const zero_size = rect.width === 0 && rect.height === 0;
+                const hidden = style.display === "none" || style.visibility === "hidden" || zero_size;
+                return {{
+                    found: true,
+                    hidden: hidden,
+                    zero_size: zero_size,
+                    tag: el.tagName,
+                }};
             }})()
         ''')
 

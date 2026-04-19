@@ -41,7 +41,8 @@ class ElementTools(ToolBase):
                     return "Error: ID not found. The page may have changed. Please run get_interaction_tree() again."
                 raise ElementNotFoundError(selector)
             if check.get("hidden"):
-                return f"Error: Element '{selector}' is hidden. Cannot click."
+                reason = "0x0 rect" if check.get("zero_size") else "display/visibility hidden"
+                return f"Error: Element '{selector}' is hidden ({reason}). Cannot click."
             elem = await self.try_select(selector)
             if elem:
                 await elem.click()
@@ -58,8 +59,11 @@ class ElementTools(ToolBase):
             import json as _json
 
             safe_text = _json.dumps(text)
+            # Drop ``return`` - a bare top-level return is a SyntaxError in
+            # CDP Runtime.evaluate. The completion value of the final
+            # expression statement is what we want back.
             result = await self.run_js(
-                CLICK_BY_TEXT_SHADOW_JS + f"\nreturn clickByTextShadow({safe_text});\n"
+                CLICK_BY_TEXT_SHADOW_JS + f"\nclickByTextShadow({safe_text})\n"
             )
             if not isinstance(result, dict) or not result.get("ok"):
                 raise ElementNotFoundError(f"text={text!r}")
@@ -88,7 +92,7 @@ class ElementTools(ToolBase):
         selector = self.resolve_selector(selector)
         safe_sel = _json.dumps(selector)
         result = await self.run_js(
-            CLICK_SHADOW_HOST_JS + f"\nreturn clickShadowHost({safe_sel}, {int(max_depth)});\n"
+            CLICK_SHADOW_HOST_JS + f"\nclickShadowHost({safe_sel}, {int(max_depth)})\n"
         )
         if not isinstance(result, dict) or not result.get("ok"):
             reason = result.get("reason") if isinstance(result, dict) else "unknown"
@@ -116,7 +120,7 @@ class ElementTools(ToolBase):
         selector = self.resolve_selector(selector)
         safe_sel = _json.dumps(selector)
         result = await self.run_js(
-            DESCRIBE_SHADOW_JS + f"\nreturn describeShadow({safe_sel}, {int(max_depth)});\n"
+            DESCRIBE_SHADOW_JS + f"\ndescribeShadow({safe_sel}, {int(max_depth)})\n"
         )
         if not isinstance(result, dict) or not result.get("ok"):
             raise ElementNotFoundError(selector)
@@ -130,7 +134,11 @@ class ElementTools(ToolBase):
         """
         selector = self.resolve_selector(selector)
 
-        await self.click(selector)
+        # Propagate click errors (hidden element, 0x0 rect, not found) so
+        # we don't blast insert_text into whatever else holds focus.
+        click_result = await self.click(selector)
+        if click_result.startswith("Error:"):
+            return click_result
         if replace:
             # clear_input uses elem.apply(...) which doesn't move focus, so
             # no need to re-click here; doing so would double-fire click
