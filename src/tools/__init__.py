@@ -6,9 +6,11 @@ from src.tools.browser import BrowserTools
 from src.tools.content import ContentTools
 from src.tools.elements import ElementTools
 from src.tools.forms import FormTools
+from src.tools.humanlike import HumanInputTools
 from src.tools.logging import LoggingTools
 from src.tools.navigation import NavigationTools
 from src.tools.query import QueryTools
+from src.tools.stealth import StealthTools
 from src.tools.storage import StorageTools
 from src.tools.tabs import TabTools
 from src.tools.utils import UtilityTools
@@ -27,6 +29,8 @@ _storage_tools = StorageTools(mcp)
 _logging_tools = LoggingTools(mcp)
 _form_tools = FormTools(mcp)
 _utility_tools = UtilityTools(mcp)
+_stealth_tools = StealthTools(mcp)
+_human_input_tools = HumanInputTools(mcp)
 
 # export individual tool functions for backwards compatibility
 # browser lifecycle
@@ -98,6 +102,20 @@ wait = _utility_tools.wait
 wait_for_element = _utility_tools.wait_for_element
 run_security_audit = _utility_tools.run_security_audit
 
+# stealth
+bypass_cloudflare = _stealth_tools.bypass_cloudflare
+is_cloudflare_challenge_present = _stealth_tools.is_cloudflare_challenge_present
+set_user_agent = _stealth_tools.set_user_agent
+clear_user_agent = _stealth_tools.clear_user_agent
+set_locale = _stealth_tools.set_locale
+set_timezone = _stealth_tools.set_timezone
+set_geolocation = _stealth_tools.set_geolocation
+
+# human input
+human_click = _human_input_tools.human_click
+human_type = _human_input_tools.human_type
+estimated_typing_duration = _human_input_tools.estimated_typing_duration
+
 __all__ = [
     # mcp server
     "mcp",
@@ -114,6 +132,8 @@ __all__ = [
     "LoggingTools",
     "FormTools",
     "UtilityTools",
+    "StealthTools",
+    "HumanInputTools",
     # individual tool functions
     "start_browser",
     "stop_browser",
@@ -164,4 +184,14 @@ __all__ = [
     "wait",
     "wait_for_element",
     "run_security_audit",
+    "bypass_cloudflare",
+    "is_cloudflare_challenge_present",
+    "set_user_agent",
+    "clear_user_agent",
+    "set_locale",
+    "set_timezone",
+    "set_geolocation",
+    "human_click",
+    "human_type",
+    "estimated_typing_duration",
 ]
