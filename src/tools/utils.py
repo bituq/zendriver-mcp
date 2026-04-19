@@ -4,7 +4,6 @@ import json
 import os
 import tempfile
 from datetime import datetime
-from typing import Optional
 
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
@@ -23,7 +22,7 @@ class UtilityTools(ToolBase):
         self._mcp.tool()(self.wait_for_element)
         self._mcp.tool()(self.run_security_audit)
 
-    async def screenshot(self, save_path: Optional[str] = None) -> Image:
+    async def screenshot(self, save_path: str | None = None) -> Image:
         """Take a screenshot of the current page and return as viewable image.
 
         Args:
@@ -53,13 +52,13 @@ class UtilityTools(ToolBase):
                 if save_path:
                     # Determine format from extension
                     ext = os.path.splitext(save_path)[1].lower()
-                    if ext in ['.png', '.gif', '.bmp']:
+                    if ext in [".png", ".gif", ".bmp"]:
                         # Re-open original for lossless formats
                         with PILImage.open(tmp_path) as orig:
                             orig.save(save_path)
                     else:
                         # Save as JPEG for .jpg/.jpeg or unknown
-                        with open(save_path, 'wb') as f:
+                        with open(save_path, "wb") as f:
                             f.write(jpeg_data)
 
                 return Image(data=jpeg_data, format="jpeg")
@@ -87,7 +86,7 @@ class UtilityTools(ToolBase):
         """
         # check for common mistakes
         stripped = script.strip()
-        if stripped.startswith('return ') and '(' not in stripped[:20]:
+        if stripped.startswith("return ") and "(" not in stripped[:20]:
             return (
                 "Error: Cannot use bare 'return' statement. "
                 "Either remove 'return' (for simple expressions) or wrap in an IIFE: "
@@ -102,7 +101,7 @@ class UtilityTools(ToolBase):
         except Exception as e:
             error_msg = str(e)
             # provide helpful error messages
-            if 'SyntaxError' in error_msg and 'return' in script.lower():
+            if "SyntaxError" in error_msg and "return" in script.lower():
                 return (
                     f"SyntaxError: Illegal return statement. "
                     f"Wrap your code in an IIFE: (function() {{ {script} }})()"
@@ -114,7 +113,9 @@ class UtilityTools(ToolBase):
         await self.session.page.wait(seconds)
         return f"Waited {seconds}s"
 
-    async def wait_for_element(self, selector: str, timeout: float = 30.0, visible: bool = True) -> str:
+    async def wait_for_element(
+        self, selector: str, timeout: float = 30.0, visible: bool = True
+    ) -> str:
         """Wait for an element to appear on the page.
 
         Args:
@@ -187,16 +188,20 @@ class UtilityTools(ToolBase):
             "=" * 60,
             f"URL: {url}",
             f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            "=" * 60, ""
+            "=" * 60,
+            "",
         ]
 
         # https check
-        is_https = url.startswith('https://')
+        is_https = url.startswith("https://")
         status = "PASS" if is_https else "FAIL"
-        lines.append(f"[{status}] HTTPS: {self.bool_to_yes_no(is_https)}" + ("" if is_https else " - INSECURE"))
+        lines.append(
+            f"[{status}] HTTPS: {self.bool_to_yes_no(is_https)}"
+            + ("" if is_https else " - INSECURE")
+        )
 
         # form security check
-        forms_result = await self.run_js('''
+        forms_result = await self.run_js("""
             (function() {
                 const forms = document.forms;
                 let hasCSRF = false, hasInsecurePassword = false, formCount = forms.length;
@@ -210,17 +215,25 @@ class UtilityTools(ToolBase):
                 }
                 return { count: formCount, hasCSRF, hasInsecurePassword, passwordForms };
             })()
-        ''')
+        """)
 
-        csrf_status = "WARN" if forms_result['count'] > 0 and not forms_result['hasCSRF'] else "PASS"
-        lines.append(f"[{csrf_status}] CSRF Protection: {'Detected' if forms_result['hasCSRF'] else 'Not detected'}")
+        csrf_status = (
+            "WARN" if forms_result["count"] > 0 and not forms_result["hasCSRF"] else "PASS"
+        )
+        lines.append(
+            f"[{csrf_status}] CSRF Protection: {'Detected' if forms_result['hasCSRF'] else 'Not detected'}"
+        )
 
-        pwd_status = "FAIL" if forms_result['hasInsecurePassword'] else "PASS"
-        lines.append(f"[{pwd_status}] Password Security: {'INSECURE - GET method' if forms_result['hasInsecurePassword'] else 'OK'}")
-        lines.append(f"[INFO] Forms: {forms_result['count']} total, {forms_result['passwordForms']} with passwords")
+        pwd_status = "FAIL" if forms_result["hasInsecurePassword"] else "PASS"
+        lines.append(
+            f"[{pwd_status}] Password Security: {'INSECURE - GET method' if forms_result['hasInsecurePassword'] else 'OK'}"
+        )
+        lines.append(
+            f"[INFO] Forms: {forms_result['count']} total, {forms_result['passwordForms']} with passwords"
+        )
 
         # mixed content check
-        mixed = await self.run_js('''
+        mixed = await self.run_js("""
             (function() {
                 if (location.protocol !== 'https:') return { check: false };
                 const httpScripts = Array.from(document.scripts).filter(s => s.src?.startsWith('http://')).length;
@@ -229,12 +242,14 @@ class UtilityTools(ToolBase):
                 return { check: true, scripts: httpScripts, styles: httpStyles, images: httpImages,
                          total: httpScripts + httpStyles + httpImages };
             })()
-        ''')
+        """)
 
-        if mixed['check']:
-            mixed_status = "FAIL" if mixed['total'] > 0 else "PASS"
-            if mixed['total'] > 0:
-                lines.append(f"[{mixed_status}] Mixed Content: {mixed['scripts']} scripts, {mixed['styles']} styles, {mixed['images']} images over HTTP")
+        if mixed["check"]:
+            mixed_status = "FAIL" if mixed["total"] > 0 else "PASS"
+            if mixed["total"] > 0:
+                lines.append(
+                    f"[{mixed_status}] Mixed Content: {mixed['scripts']} scripts, {mixed['styles']} styles, {mixed['images']} images over HTTP"
+                )
             else:
                 lines.append(f"[{mixed_status}] Mixed Content: None")
 
@@ -244,12 +259,14 @@ class UtilityTools(ToolBase):
         lines.append(f"[{inline_status}] Inline Scripts: {inline}")
 
         # sri check
-        no_integrity = await self.run_js('Array.from(document.scripts).filter(s => s.src && !s.integrity).length')
+        no_integrity = await self.run_js(
+            "Array.from(document.scripts).filter(s => s.src && !s.integrity).length"
+        )
         sri_status = "WARN" if no_integrity > 0 else "PASS"
         lines.append(f"[{sri_status}] Scripts without SRI: {no_integrity}")
 
         # external resources
-        external = await self.run_js('''
+        external = await self.run_js("""
             (function() {
                 const currentHost = location.hostname;
                 const getHost = url => { try { return new URL(url).hostname; } catch { return null; } };
@@ -257,12 +274,14 @@ class UtilityTools(ToolBase):
                 const iframes = Array.from(document.querySelectorAll('iframe')).filter(f => f.src && getHost(f.src) !== currentHost).length;
                 return { scripts, iframes };
             })()
-        ''')
-        ext_status = "INFO" if external['scripts'] > 0 else "PASS"
-        lines.append(f"[{ext_status}] External Scripts: {external['scripts']}, External Iframes: {external['iframes']}")
+        """)
+        ext_status = "INFO" if external["scripts"] > 0 else "PASS"
+        lines.append(
+            f"[{ext_status}] External Scripts: {external['scripts']}, External Iframes: {external['iframes']}"
+        )
 
         # dangerous js patterns
-        dangerous = await self.run_js('''
+        dangerous = await self.run_js("""
             (function() {
                 const scripts = Array.from(document.scripts).map(s => s.innerHTML).join('\\n');
                 return {
@@ -271,17 +290,19 @@ class UtilityTools(ToolBase):
                     documentWrite: (scripts.match(/document\\.write\\s*\\(/g) || []).length
                 };
             })()
-        ''')
+        """)
 
-        dangerous_total = dangerous['eval'] + dangerous['innerHTML'] + dangerous['documentWrite']
+        dangerous_total = dangerous["eval"] + dangerous["innerHTML"] + dangerous["documentWrite"]
         js_status = "WARN" if dangerous_total > 0 else "PASS"
         if dangerous_total > 0:
-            lines.append(f"[{js_status}] Dangerous JS Patterns: eval({dangerous['eval']}), innerHTML({dangerous['innerHTML']}), document.write({dangerous['documentWrite']})")
+            lines.append(
+                f"[{js_status}] Dangerous JS Patterns: eval({dangerous['eval']}), innerHTML({dangerous['innerHTML']}), document.write({dangerous['documentWrite']})"
+            )
         else:
             lines.append(f"[{js_status}] Dangerous JS Patterns: None detected")
 
         # sensitive data scan
-        sensitive = await self.run_js('''
+        sensitive = await self.run_js("""
             (function() {
                 const html = document.documentElement.outerHTML;
                 return {
@@ -290,12 +311,14 @@ class UtilityTools(ToolBase):
                     privateKeys: (html.match(/-----BEGIN (RSA |EC |DSA |)PRIVATE KEY-----/g) || []).length
                 };
             })()
-        ''')
+        """)
 
-        sensitive_total = sensitive['awsKeys'] + sensitive['jwtTokens'] + sensitive['privateKeys']
+        sensitive_total = sensitive["awsKeys"] + sensitive["jwtTokens"] + sensitive["privateKeys"]
         sens_status = "FAIL" if sensitive_total > 0 else "PASS"
         if sensitive_total > 0:
-            lines.append(f"[{sens_status}] Exposed Secrets: AWS keys({sensitive['awsKeys']}), JWT tokens({sensitive['jwtTokens']}), Private keys({sensitive['privateKeys']})")
+            lines.append(
+                f"[{sens_status}] Exposed Secrets: AWS keys({sensitive['awsKeys']}), JWT tokens({sensitive['jwtTokens']}), Private keys({sensitive['privateKeys']})"
+            )
         else:
             lines.append(f"[{sens_status}] Exposed Secrets: None detected")
 
@@ -303,9 +326,9 @@ class UtilityTools(ToolBase):
 
         # summary
         checks = lines[7:]
-        fails = sum(1 for line in checks if line.startswith('[FAIL]'))
-        warns = sum(1 for line in checks if line.startswith('[WARN]'))
-        passes = sum(1 for line in checks if line.startswith('[PASS]'))
+        fails = sum(1 for line in checks if line.startswith("[FAIL]"))
+        warns = sum(1 for line in checks if line.startswith("[WARN]"))
+        passes = sum(1 for line in checks if line.startswith("[PASS]"))
 
         if fails > 0:
             lines.append(f"RESULT: {fails} CRITICAL, {warns} WARNINGS, {passes} PASSED")

@@ -1,8 +1,25 @@
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.egg-info/
+build/
+dist/
 
+# Virtual env
 .venv/
+
+# Env / config
 .env
 .claude
 .mcp.json
+
+# OS
+.DS_Store
+
+# Tool caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/

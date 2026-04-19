@@ -1,10 +1,11 @@
 # Browser session management for Zendriver MCP server.
 # Includes CDP event listeners for network and console logging.
 
+from datetime import datetime
+from typing import Any
+
 import zendriver as zd
 from zendriver import cdp
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 
 from src.errors import BrowserNotStartedError, PageNotLoadedError
 
@@ -12,16 +13,16 @@ from src.errors import BrowserNotStartedError, PageNotLoadedError
 class BrowserSession:
     """Singleton class to manage browser session across all tool calls."""
 
-    default_browser_path: Optional[str] = None
+    default_browser_path: str | None = None
     _instance: "BrowserSession | None" = None
     _browser: zd.Browser | None = None
     _page: zd.Tab | None = None
-    _tabs: Dict[str, zd.Tab] = {}
+    _tabs: dict[str, zd.Tab] = {}
     _tab_counter: int = 0
-    _network_logs: List[Dict[str, Any]] = []
-    _console_logs: List[Dict[str, Any]] = []
-    _pending_requests: Dict[str, Dict[str, Any]] = {}
-    _cdp_enabled_tabs: Dict[int, bool] = {}  # Track tabs with CDP listeners
+    _network_logs: list[dict[str, Any]] = []
+    _console_logs: list[dict[str, Any]] = []
+    _pending_requests: dict[str, dict[str, Any]] = {}
+    _cdp_enabled_tabs: dict[int, bool] = {}  # Track tabs with CDP listeners
 
     def __new__(cls) -> "BrowserSession":
         if cls._instance is None:
@@ -70,10 +71,10 @@ class BrowserSession:
     async def start(
         self,
         headless: bool = False,
-        user_data_dir: Optional[str] = None,
-        proxy: Optional[str] = None,
-        browser_args: Optional[List[str]] = None,
-        browser_executable_path: Optional[str] = None
+        user_data_dir: str | None = None,
+        proxy: str | None = None,
+        browser_args: list[str] | None = None,
+        browser_executable_path: str | None = None,
     ) -> zd.Browser:
         """Start the browser with configuration."""
         if self._browser is None:
@@ -87,7 +88,7 @@ class BrowserSession:
                 headless=headless,
                 user_data_dir=user_data_dir,
                 browser_args=args if args else None,
-                browser_executable_path=exe
+                browser_executable_path=exe,
             )
 
             # Clear state on new session
@@ -143,7 +144,7 @@ class BrowserSession:
             "url": event.request.url,
             "method": event.request.method,
             "timestamp": datetime.now().isoformat(),
-            "type": str(event.type_) if event.type_ else "unknown"
+            "type": str(event.type_) if event.type_ else "unknown",
         }
 
     async def _on_response_received(self, event: cdp.network.ResponseReceived) -> None:
@@ -158,7 +159,7 @@ class BrowserSession:
             "status_text": event.response.status_text,
             "type": str(event.type_) if event.type_ else pending.get("type", "unknown"),
             "mime_type": event.response.mime_type,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         self._network_logs.append(log_entry)
@@ -179,7 +180,7 @@ class BrowserSession:
                 "status": 0,
                 "status_text": f"FAILED: {event.error_text}",
                 "type": pending.get("type", "unknown"),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
             self._network_logs.append(log_entry)
 
@@ -201,7 +202,7 @@ class BrowserSession:
         log_entry = {
             "type": str(event.type_),
             "text": " ".join(args_text),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         self._console_logs.append(log_entry)
@@ -228,7 +229,7 @@ class BrowserSession:
             await self._page.get(url)
         return self._page
 
-    async def create_tab(self, url: Optional[str] = None) -> tuple[str, zd.Tab]:
+    async def create_tab(self, url: str | None = None) -> tuple[str, zd.Tab]:
         """Create a new tab and return its ID."""
         browser = self.browser
         if url:
@@ -267,7 +268,7 @@ class BrowserSession:
             else:
                 self._page = None
 
-    def get_all_tabs(self) -> Dict[str, str]:
+    def get_all_tabs(self) -> dict[str, str]:
         """Get all open tabs with their URLs."""
         result = {}
         for tab_id, tab in self._tabs.items():
@@ -275,11 +276,11 @@ class BrowserSession:
             result[tab_id] = url
         return result
 
-    def get_network_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_network_logs(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get recent network logs."""
         return self._network_logs[-limit:]
 
-    def get_console_logs(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_console_logs(self, limit: int = 100) -> list[dict[str, Any]]:
         """Get recent console logs."""
         return self._console_logs[-limit:]
 

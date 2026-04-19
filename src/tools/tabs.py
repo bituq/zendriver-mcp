@@ -1,5 +1,4 @@
 # tab management tools - new tab, list, switch, close
-from typing import Optional
 
 from src.tools.base import ToolBase
 
@@ -14,7 +13,7 @@ class TabTools(ToolBase):
         self._mcp.tool()(self.switch_tab)
         self._mcp.tool()(self.close_tab)
 
-    async def new_tab(self, url: Optional[str] = None) -> str:
+    async def new_tab(self, url: str | None = None) -> str:
         """Open a new browser tab."""
         tab_id, tab = await self.session.create_tab(url)
         self.session.page = tab

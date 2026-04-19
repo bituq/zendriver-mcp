@@ -3,14 +3,14 @@ from mcp.server.fastmcp import FastMCP
 
 from src.tools.base import ToolBase
 from src.tools.browser import BrowserTools
-from src.tools.navigation import NavigationTools
-from src.tools.tabs import TabTools
-from src.tools.elements import ElementTools
-from src.tools.query import QueryTools
 from src.tools.content import ContentTools
-from src.tools.storage import StorageTools
-from src.tools.logging import LoggingTools
+from src.tools.elements import ElementTools
 from src.tools.forms import FormTools
+from src.tools.logging import LoggingTools
+from src.tools.navigation import NavigationTools
+from src.tools.query import QueryTools
+from src.tools.storage import StorageTools
+from src.tools.tabs import TabTools
 from src.tools.utils import UtilityTools
 
 # initialize the MCP server
@@ -115,15 +115,53 @@ __all__ = [
     "FormTools",
     "UtilityTools",
     # individual tool functions
-    "start_browser", "stop_browser", "get_browser_status",
-    "navigate", "go_back", "go_forward", "reload_page", "get_page_info",
-    "new_tab", "list_tabs", "switch_tab", "close_tab",
-    "click", "type_text", "clear_input", "focus_element", "select_option", "upload_file",
-    "find_element", "find_all_elements", "get_element_text", "get_element_attribute",
-    "find_buttons", "find_inputs",
-    "get_content", "get_text_content", "get_interaction_tree", "scroll", "scroll_to_element",
-    "get_cookies", "set_cookie", "get_local_storage", "set_local_storage", "clear_storage",
-    "get_network_logs", "get_console_logs", "clear_logs", "wait_for_network", "wait_for_request",
-    "fill_form", "submit_form", "press_key", "press_enter", "mouse_click",
-    "screenshot", "execute_js", "wait", "wait_for_element", "run_security_audit",
+    "start_browser",
+    "stop_browser",
+    "get_browser_status",
+    "navigate",
+    "go_back",
+    "go_forward",
+    "reload_page",
+    "get_page_info",
+    "new_tab",
+    "list_tabs",
+    "switch_tab",
+    "close_tab",
+    "click",
+    "type_text",
+    "clear_input",
+    "focus_element",
+    "select_option",
+    "upload_file",
+    "find_element",
+    "find_all_elements",
+    "get_element_text",
+    "get_element_attribute",
+    "find_buttons",
+    "find_inputs",
+    "get_content",
+    "get_text_content",
+    "get_interaction_tree",
+    "scroll",
+    "scroll_to_element",
+    "get_cookies",
+    "set_cookie",
+    "get_local_storage",
+    "set_local_storage",
+    "clear_storage",
+    "get_network_logs",
+    "get_console_logs",
+    "clear_logs",
+    "wait_for_network",
+    "wait_for_request",
+    "fill_form",
+    "submit_form",
+    "press_key",
+    "press_enter",
+    "mouse_click",
+    "screenshot",
+    "execute_js",
+    "wait",
+    "wait_for_element",
+    "run_security_audit",
 ]

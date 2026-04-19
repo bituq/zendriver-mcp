@@ -1,5 +1,4 @@
 # storage tools - cookies and localStorage management
-from typing import Optional
 
 from src.tools.base import ToolBase
 
@@ -17,10 +16,10 @@ class StorageTools(ToolBase):
 
     async def get_cookies(self) -> str:
         """Get all cookies for the current page."""
-        cookies = await self.run_js('document.cookie')
+        cookies = await self.run_js("document.cookie")
         return cookies if cookies else "(no cookies)"
 
-    async def set_cookie(self, name: str, value: str, domain: Optional[str] = None) -> str:
+    async def set_cookie(self, name: str, value: str, domain: str | None = None) -> str:
         """Set a cookie."""
         safe_name = self.escape_js_string(name)
         safe_value = self.escape_js_string(value)
@@ -32,7 +31,7 @@ class StorageTools(ToolBase):
 
     async def get_local_storage(self) -> str:
         """Get all localStorage items."""
-        storage = await self.run_js('JSON.stringify(localStorage)')
+        storage = await self.run_js("JSON.stringify(localStorage)")
         return storage if storage else "{}"
 
     async def set_local_storage(self, key: str, value: str) -> str:
@@ -44,5 +43,5 @@ class StorageTools(ToolBase):
 
     async def clear_storage(self) -> str:
         """Clear localStorage and sessionStorage."""
-        await self.run_js('localStorage.clear(); sessionStorage.clear()')
+        await self.run_js("localStorage.clear(); sessionStorage.clear()")
         return "Cleared localStorage and sessionStorage"

@@ -20,24 +20,24 @@ class ContentTools(ToolBase):
 
     async def get_text_content(self) -> str:
         """Get all visible text from the page."""
-        text = await self.run_js('document.body.innerText')
+        text = await self.run_js("document.body.innerText")
         return self.truncate(text, 30000)
 
     async def get_interaction_tree(self) -> str:
         """Get a simplified tree of interactive elements with unique IDs.
-        
-        Uses a sophisticated heuristic to find interactive elements (buttons, inputs, 
+
+        Uses a sophisticated heuristic to find interactive elements (buttons, inputs,
         shadow DOM components), assigns them unique IDs, and returns a clean list.
         """
         import json
         import os
-        
+
         # Load the JS walker script
         script_path = os.path.join(os.path.dirname(__file__), "..", "static", "js", "dom_walker.js")
         if not os.path.exists(script_path):
             return "Error: dom_walker.js not found in static/js"
-            
-        with open(script_path, "r", encoding="utf-8") as f:
+
+        with open(script_path, encoding="utf-8") as f:
             js_code = f.read()
 
         try:
@@ -60,5 +60,7 @@ class ContentTools(ToolBase):
     async def scroll_to_element(self, selector: str) -> str:
         """Scroll to bring an element into view."""
         safe_sel = self.escape_js_string(selector)
-        await self.run_js(f'document.querySelector("{safe_sel}")?.scrollIntoView({{behavior: "smooth", block: "center"}})')
+        await self.run_js(
+            f'document.querySelector("{safe_sel}")?.scrollIntoView({{behavior: "smooth", block: "center"}})'
+        )
         return f"Scrolled to: {selector}"

@@ -1,6 +1,5 @@
 # form and input tools - fill form, submit, keyboard, mouse
 import json
-from typing import Optional
 
 from src.tools.base import ToolBase
 
@@ -36,7 +35,7 @@ class FormTools(ToolBase):
         await self.run_js(f'document.querySelector("{safe_sel}")?.submit()')
         return f"Form submitted: {selector}"
 
-    async def press_key(self, key: str, selector: Optional[str] = None) -> str:
+    async def press_key(self, key: str, selector: str | None = None) -> str:
         """Press a keyboard key with full event simulation.
 
         Args:
@@ -49,16 +48,28 @@ class FormTools(ToolBase):
 
         # map common key names to their codes
         key_codes = {
-            'Enter': 13, 'Tab': 9, 'Escape': 27, 'Backspace': 8, 'Delete': 46,
-            'ArrowUp': 38, 'ArrowDown': 40, 'ArrowLeft': 37, 'ArrowRight': 39,
-            'Space': 32, ' ': 32, 'Home': 36, 'End': 35, 'PageUp': 33, 'PageDown': 34
+            "Enter": 13,
+            "Tab": 9,
+            "Escape": 27,
+            "Backspace": 8,
+            "Delete": 46,
+            "ArrowUp": 38,
+            "ArrowDown": 40,
+            "ArrowLeft": 37,
+            "ArrowRight": 39,
+            "Space": 32,
+            " ": 32,
+            "Home": 36,
+            "End": 35,
+            "PageUp": 33,
+            "PageDown": 34,
         }
 
         if selector:
             safe_sel = self.escape_js_string(selector)
             target_js = f'document.querySelector("{safe_sel}")'
         else:
-            target_js = 'document.activeElement'
+            target_js = "document.activeElement"
 
         await self.run_js(f'''
             (function() {{
@@ -133,7 +144,7 @@ class FormTools(ToolBase):
         ''')
         return f"Pressed key: {key}" + (f" on {selector}" if selector else "")
 
-    async def press_enter(self, selector: Optional[str] = None) -> str:
+    async def press_enter(self, selector: str | None = None) -> str:
         """Press Enter key - convenience wrapper for press_key('Enter')."""
         return await self.press_key("Enter", selector)
 

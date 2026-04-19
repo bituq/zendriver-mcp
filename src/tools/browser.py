@@ -1,5 +1,4 @@
 # browser lifecycle tools - start, stop, status
-from typing import Optional
 
 from src.tools.base import ToolBase
 
@@ -14,10 +13,7 @@ class BrowserTools(ToolBase):
         self._mcp.tool()(self.get_browser_status)
 
     async def start_browser(
-        self,
-        headless: bool = False,
-        proxy: Optional[str] = None,
-        user_data_dir: Optional[str] = None
+        self, headless: bool = False, proxy: str | None = None, user_data_dir: str | None = None
     ) -> str:
         """Start the browser with configuration options."""
         await self.session.start(headless=headless, proxy=proxy, user_data_dir=user_data_dir)
@@ -44,7 +40,7 @@ class BrowserTools(ToolBase):
 
         # list all open tabs
         tabs = self.session.get_all_tabs()
-        lines = [f"Browser: Running", f"Open tabs: {len(tabs)}"]
+        lines = ["Browser: Running", f"Open tabs: {len(tabs)}"]
         for tab_id, url in tabs.items():
             lines.append(f"  - {tab_id}: {url}")
         return "\n".join(lines)

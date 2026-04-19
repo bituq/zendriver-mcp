@@ -1,12 +1,13 @@
 # base class for all tool modules
 import time
-from abc import ABC
-from typing import Any, Callable
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 
-from src.session import BrowserSession
 from src.errors import ElementNotFoundError
+from src.session import BrowserSession
 
 
 class ToolBase(ABC):
@@ -17,9 +18,9 @@ class ToolBase(ABC):
         self._session = BrowserSession.get_instance()
         self._register_tools()
 
+    @abstractmethod
     def _register_tools(self) -> None:
-        """override in subclasses to register tools with mcp"""
-        pass
+        """register this module's tools with the mcp server"""
 
     @property
     def session(self) -> BrowserSession:
@@ -34,11 +35,13 @@ class ToolBase(ABC):
     @staticmethod
     def escape_js_string(s: str) -> str:
         """escape special characters for safe JavaScript string interpolation"""
-        return (s.replace("\\", "\\\\")
-                 .replace('"', '\\"')
-                 .replace("'", "\\'")
-                 .replace("\n", "\\n")
-                 .replace("\r", "\\r"))
+        return (
+            s.replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("'", "\\'")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+        )
 
     async def get_element(self, selector: str):
         """get element by selector, raise error if not found"""
@@ -72,10 +75,7 @@ class ToolBase(ABC):
         ''')
 
     async def wait_for_condition(
-        self,
-        check_fn: Callable,
-        timeout: float,
-        poll_interval: float = 0.5
+        self, check_fn: Callable, timeout: float, poll_interval: float = 0.5
     ) -> bool:
         """wait for a condition to be true within timeout"""
         start = time.time()

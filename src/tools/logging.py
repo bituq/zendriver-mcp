@@ -1,6 +1,5 @@
 # logging tools - network and console log management
 import time
-from typing import Optional
 
 from src.tools.base import ToolBase
 
@@ -24,9 +23,9 @@ class LoggingTools(ToolBase):
 
         lines = [f"Network logs ({len(logs)} entries):"]
         for log in logs:
-            method = log.get('method', 'GET')
-            url = log.get('url', 'unknown')[:80]
-            status = log.get('status', '?')
+            method = log.get("method", "GET")
+            url = log.get("url", "unknown")[:80]
+            status = log.get("status", "?")
             lines.append(f"  {method} {url} - {status}")
         return "\n".join(lines)
 
@@ -38,8 +37,8 @@ class LoggingTools(ToolBase):
 
         lines = [f"Console logs ({len(logs)} entries):"]
         for log in logs:
-            log_type = log.get('type', 'log')
-            text = log.get('text', '')[:100]
+            log_type = log.get("type", "log")
+            text = log.get("text", "")[:100]
             lines.append(f"  [{log_type}] {text}")
         return "\n".join(lines)
 
@@ -83,10 +82,7 @@ class LoggingTools(ToolBase):
         return f"Timeout after {timeout}s - network may still be active ({last_count} requests captured)"
 
     async def wait_for_request(
-        self,
-        url_pattern: str,
-        timeout: float = 30.0,
-        method: Optional[str] = None
+        self, url_pattern: str, timeout: float = 30.0, method: str | None = None
     ) -> str:
         """Wait for a specific network request to complete.
 
@@ -112,15 +108,15 @@ class LoggingTools(ToolBase):
                     continue
                 seen_requests.add(req_id)
 
-                url = log.get('url', '').lower()
-                req_method = log.get('method', 'GET')
+                url = log.get("url", "").lower()
+                req_method = log.get("method", "GET")
 
                 # check if this request matches our pattern
                 if safe_pattern in url:
                     if safe_method and req_method != safe_method:
                         continue
 
-                    status = log.get('status', '?')
+                    status = log.get("status", "?")
                     elapsed = time.time() - start
                     return (
                         f"Found matching request after {elapsed:.1f}s:\n"

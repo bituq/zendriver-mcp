@@ -1,8 +1,9 @@
 # element interaction tools - click, type, clear, focus, select, upload
-from typing import Optional
 
-from src.tools.base import ToolBase
+from zendriver import cdp
+
 from src.errors import ElementNotFoundError
+from src.tools.base import ToolBase
 
 
 class ElementTools(ToolBase):
@@ -17,18 +18,18 @@ class ElementTools(ToolBase):
         self._mcp.tool()(self.select_option)
         self._mcp.tool()(self.upload_file)
 
-    async def click(self, selector: Optional[str] = None, text: Optional[str] = None) -> str:
+    async def click(self, selector: str | None = None, text: str | None = None) -> str:
         """Click a visible element by CSS selector, numeric ID (from get_interaction_tree), or text content."""
         if selector:
             if selector.isdigit():
                 selector = f'[data-zendriver-id="{selector}"]'
 
             check = await self.check_visibility(selector)
-            if not check['found']:
-                if '[data-zendriver-id=' in selector:
-                     return "Error: ID not found. The page may have changed. Please run get_interaction_tree() again."
+            if not check["found"]:
+                if "[data-zendriver-id=" in selector:
+                    return "Error: ID not found. The page may have changed. Please run get_interaction_tree() again."
                 raise ElementNotFoundError(selector)
-            if check.get('hidden'):
+            if check.get("hidden"):
                 return f"Error: Element '{selector}' is hidden. Cannot click."
             elem = await self.session.page.select(selector)
             if elem:
@@ -51,14 +52,10 @@ class ElementTools(ToolBase):
         # Focus the element by clicking it
         await self.click(selector)
 
-        # Now insert text via CDP
-        # `self._tab` refers to the current Tab object,
-        # which exposes the CDP command interface
-        await self._tab.cdp.input_.insert_text(text)
+        # Insert text via CDP Input.insertText (no JS, survives contenteditable)
+        await self.session.page.send(cdp.input_.insert_text(text=text))
 
         return f"Typed into {selector}"
-
-
 
     async def clear_input(self, selector: str) -> str:
         """Clear an input field or contenteditable element."""
@@ -70,7 +67,9 @@ class ElementTools(ToolBase):
             return f"Error: Element not found - {selector}"
 
         # Select all and delete
-        await elem.apply("(el) => { el.focus(); document.execCommand('selectAll'); document.execCommand('delete'); }")
+        await elem.apply(
+            "(el) => { el.focus(); document.execCommand('selectAll'); document.execCommand('delete'); }"
+        )
         return f"Cleared: {selector}"
 
     async def focus_element(self, selector: str) -> str:

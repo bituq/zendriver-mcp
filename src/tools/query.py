@@ -1,5 +1,4 @@
 # element query tools - find element, find all, get text, get attribute, find buttons
-from typing import Optional
 
 from src.tools.base import ToolBase
 
@@ -16,7 +15,7 @@ class QueryTools(ToolBase):
         self._mcp.tool()(self.find_buttons)
         self._mcp.tool()(self.find_inputs)
 
-    async def find_element(self, selector: Optional[str] = None, text: Optional[str] = None) -> str:
+    async def find_element(self, selector: str | None = None, text: str | None = None) -> str:
         """Find an element and return information about it.
 
         Provides helpful suggestions if element is not found.
@@ -31,7 +30,7 @@ class QueryTools(ToolBase):
 
             if elem is None:
                 # provide helpful suggestions
-                suggestions = await self.run_js('''
+                suggestions = await self.run_js("""
                     (function() {
                         const found = [];
                         const ce = document.querySelector('[contenteditable="true"]');
@@ -46,11 +45,11 @@ class QueryTools(ToolBase):
                         if (btn) found.push({ sel: 'button', tag: 'BUTTON' });
                         return found.slice(0, 5);
                     })()
-                ''')
+                """)
 
                 msg = f"Element not found: {selector}"
                 if suggestions:
-                    suggestions_text = ", ".join([s['sel'] for s in suggestions])
+                    suggestions_text = ", ".join([s["sel"] for s in suggestions])
                     msg += f"\nAvailable interactive elements: {suggestions_text}"
                 return msg
 
@@ -72,7 +71,7 @@ class QueryTools(ToolBase):
                 }})()
             ''')
 
-            visibility = "visible" if extra_info.get('visible', True) else "HIDDEN"
+            visibility = "visible" if extra_info.get("visible", True) else "HIDDEN"
             return f"Found <{tag}> ({visibility}): {text_content[:200] if text_content else '(no text)'}"
 
         elif text:
@@ -94,7 +93,7 @@ class QueryTools(ToolBase):
         for i, elem in enumerate(elems[:limit]):
             tag = getattr(elem, "tag_name", "unknown")
             text = (getattr(elem, "text", "") or "")[:50]
-            results.append(f"{i+1}. <{tag}> {text}")
+            results.append(f"{i + 1}. <{tag}> {text}")
 
         total, shown = len(elems), min(len(elems), limit)
         return f"Found {total} element(s) (showing {shown}):\n" + "\n".join(results)
@@ -112,7 +111,7 @@ class QueryTools(ToolBase):
         value = attrs.get(attribute) if attrs else None
         return str(value) if value else "(not set)"
 
-    async def find_buttons(self, filter_text: Optional[str] = None) -> str:
+    async def find_buttons(self, filter_text: str | None = None) -> str:
         """Find all clickable buttons on the page, including icon-only buttons.
 
         Detects: button tags, input[type=submit], [role=button], clickable divs/spans with icons.
@@ -275,11 +274,11 @@ class QueryTools(ToolBase):
 
         lines = [f"Found {len(buttons)} button(s):"]
         for i, btn in enumerate(buttons):
-            lines.append(f"  {i+1}. [{btn['type']}] {btn['description']} -> {btn['selector']}")
+            lines.append(f"  {i + 1}. [{btn['type']}] {btn['description']} -> {btn['selector']}")
 
         return "\n".join(lines)
 
-    async def find_inputs(self, filter_type: Optional[str] = None) -> str:
+    async def find_inputs(self, filter_type: str | None = None) -> str:
         """Find all input fields on the page with their selectors.
 
         Detects: input, textarea, contenteditable, [role=textbox], search boxes.
@@ -349,6 +348,6 @@ class QueryTools(ToolBase):
 
         lines = [f"Found {len(inputs)} input(s):"]
         for i, inp in enumerate(inputs):
-            lines.append(f"  {i+1}. [{inp['type']}] {inp['description']} -> {inp['selector']}")
+            lines.append(f"  {i + 1}. [{inp['type']}] {inp['description']} -> {inp['selector']}")
 
         return "\n".join(lines)

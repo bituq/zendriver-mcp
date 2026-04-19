@@ -1,37 +1,66 @@
-# Zendriver-MCP
+# zendriver-mcp
 
-A powerful MCP (Model Context Protocol) server for browser automation using Zendriver - an undetectable, async-first browser automation framework. Built specifically for LLM-powered automation with a focus on **token efficiency**.
+An MCP (Model Context Protocol) server that gives LLM agents a fully-featured,
+**undetectable** browser, backed by
+[Zendriver](https://github.com/cdpdriver/zendriver) and the raw Chrome DevTools
+Protocol. Think of it as `chrome-devtools-mcp`'s sibling, trained to go where
+Puppeteer gets blocked.
 
-## Why Zendriver?
+> **Fork notice.** This project is a fork of
+> [ShubhamChoulkar/Zendriver-MCP](https://github.com/ShubhamChoulkar/Zendriver-MCP).
+> The token-optimised DOM walker ("interaction tree") and the original 45+ MCP
+> tools are Shubham's work, used under the MIT licence. We keep that baseline
+> intact and extend it with stealth, DevTools parity, and quality-of-life
+> features. See [CHANGELOG.md](./CHANGELOG.md) for the running list.
 
-Most browser automation tools (Selenium, Playwright, Puppeteer) use WebDriver protocol, which is easily detected by anti-bot systems. **Zendriver is different:**
+## Why this fork exists
 
-| Feature | WebDriver-based | Zendriver |
-|---------|-----------------|-----------|
-| Detection | Easily detected via `navigator.webdriver` | Undetectable - no WebDriver flags |
-| Protocol | WebDriver (standardized, detectable) | CDP (Chrome DevTools Protocol) |
-| Async | Sync-first, async bolted on | Async-first architecture |
-| Bot Protection | Blocked by Cloudflare, PerimeterX, etc. | Bypasses most protections |
+Google's `chrome-devtools-mcp` is brilliant for performance work (Lighthouse,
+traces, heap snapshots), but it speaks Puppeteer - which means
+`navigator.webdriver` and Cloudflare walls. Zendriver speaks raw CDP and keeps
+a realistic fingerprint, so agents can actually use the real web.
 
-**Use cases where Zendriver is better than others:**
-- Automating sites with bot protection (Cloudflare, Akamai, etc.)
-- Scraping dynamic SPAs that block traditional automation
-- Testing authenticated workflows on protected sites
-- Building AI agents that interact with the real web
+We pair that with the DevTools-style tooling agents expect:
 
-## Features
+| Capability | chrome-devtools-mcp | zendriver-mcp |
+|---|---|---|
+| Undetected browsing (Cloudflare, Akamai, PX) | no | yes |
+| Performance traces | yes | planned |
+| Lighthouse audits | yes | planned (via subprocess) |
+| Heap snapshots | yes | planned |
+| Token-optimised DOM walker | snapshot + uids | interaction tree + uids |
+| Human-like input (mouse paths, typing delays) | no | planned |
 
-- **Undetectable** - Uses Chrome DevTools Protocol, bypassing WebDriver detection
-- **Token-Optimized DOM Walker** - 78% reduction in token usage vs raw HTML
-- **35+ Essential Tools** - Focused, powerful browser automation capabilities
-- **Modern Web Support** - Works with contenteditable divs, SPAs, and dynamic content
-- **Smart Element Handling** - Auto-skips hidden elements, provides selector suggestions
-- **CDP Network Logging** - Real-time network request and console log capture, its super easy to create endpoint based scrappers as llms can directly access the network logs
-- **Security Auditing** - Comprehensive security analysis tool
+## Roadmap
 
+**Phase 1 - stealth (in progress)**
+- `bypass_cloudflare` tool wrapping zendriver's challenge solver
+- Human-like input: bezier mouse paths, per-keystroke typing delays
+- `set_user_agent`, `set_locale`, `set_timezone`
 
+**Phase 2 - DevTools parity**
+- Emulation: viewport, device, CPU / network throttling
+- Performance traces (`Tracing.start` / `Tracing.end`)
+- Heap snapshots (`HeapProfiler.takeHeapSnapshot`)
+- Lighthouse wrapper via subprocess against the remote debugging port
 
-## Usage with Claude Desktop
+**Phase 3 - quality of life**
+- Screencast / video
+- CDP a11y-tree uids as a stable sibling to the interaction tree
+- Structured `McpResponse` formatter instead of string blobs
+- Wider test coverage, richer error taxonomy, docs site
+
+## Install
+
+Requires Python 3.10+ (we pin 3.12) and [`uv`](https://docs.astral.sh/uv/).
+
+```sh
+git clone https://github.com/bituq/zendriver-mcp.git
+cd zendriver-mcp
+uv sync
+```
+
+## Use with Claude Desktop
 
 Add to your `claude_desktop_config.json`:
 
@@ -39,91 +68,47 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "zendriver": {
-      "command": "python",
-      "args": ["path/to/Zendriver-MCP/run.py"]
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/zendriver-mcp", "run", "python", "run.py"]
     }
   }
 }
 ```
 
-## Token Optimization Protocol
+## Token-optimised DOM walker
 
-### The Problem
+The star feature from upstream: instead of dumping HTML or a verbose element
+tree to the model, the walker emits compact rows like
+`{"id": 1, "t": "btn", "l": "Search", "r": "hdr"}`.
 
-Traditional approaches send raw HTML or verbose element trees to LLMs:
-```html
-<!-- Raw HTML: ~50KB, thousands of tokens -->
-<div class="css-1dbjc4n r-1awozwy r-18u37iz r-1h0z5md" data-testid="toolBar">
-  <button class="css-18t94o4 css-1dbjc4n r-1niwhzg r-42olwf" aria-label="Search">
-    <svg viewBox="0 0 24 24" class="r-jwli3a r-4qtqp9">
-      <g><path d="M21.53 20.47l-3.66-3.66C19.195..."></path></g>
-    </svg>
-  </button>
-</div>
-```
+- **Compact keys**: `t` (type), `l` (label), `r` (region)
+- **Smart labels**: inferred from `aria-label`, `aria-labelledby`, associated
+  `<label>`, `placeholder`, text, `title`, `alt`
+- **Noise filtering**: SVG internals, nested interactive children skipped
+- **Region tagging**: `hdr`, `nav`, `main`, `side`, `ftr`, `dlg`
+- **Type compression**: `button` -> `btn`, `checkbox` -> `chk`, etc.
 
-### The Solution
-
-Our DOM walker produces **compact, semantic output**:
-```json
-{"id": 1, "t": "btn", "l": "Search", "r": "hdr"}
-```
-
-### Optimization Techniques
-
-| Technique | Before | After | Reduction |
-|-----------|--------|-------|-----------|
-| **Compact Keys** | `tagName`, `label`, `region` | `t`, `l`, `r` | ~60% |
-| **Smart Labels** | "(unlabeled)" everywhere | Inferred from aria/text/placeholder | ~40% fewer elements |
-| **SVG Filtering** | Include path, g, circle, etc. | Skip SVG internals | ~30% fewer elements |
-| **Noise Removal** | Nested interactive children | Skip redundant elements | ~20% fewer |
-| **Type Compression** | `button`, `checkbox`, `radio` | `btn`, `chk`, `rad` | ~50% |
-
-### Real-World Results
-
-**Perplexity.ai homepage:**
-- Raw HTML: ~45KB (~11,000 tokens)
-- Standard element dump: 95 elements (~2,800 tokens)
-- Our optimized output: 17 elements (~400 tokens)
-- **Total reduction: 96% fewer tokens**
-
-### Label Inference Priority
-
-Instead of showing "(unlabeled)", we infer labels from multiple sources:
-1. `aria-label` attribute
-2. `aria-labelledby` reference
-3. Associated `<label>` element
-4. `placeholder` attribute
-5. Direct text content
-6. `title` attribute
-7. `alt` attribute (for images)
-
-### Region Detection
-
-Elements are tagged with their page region for context:
-- `hdr` - Header/banner area
-- `nav` - Navigation
-- `main` - Main content
-- `side` - Sidebar/aside
-- `ftr` - Footer
-- `dlg` - Modal/dialog
-
-### Usage
+Reported reduction on perplexity.ai: ~96% fewer tokens than raw HTML (~11k ->
+~400). Usage:
 
 ```python
-# Get the optimized interaction tree
-tree = get_interaction_tree()
-# Returns: [{"id": 1, "t": "btn", "l": "Submit", "r": "main"}, ...]
-
-# Click using the numeric ID
-click("1")  # Clicks the element with id=1
-
-# Type into an input
-type_text("Hello", "3")  # Types into element with id=3
+tree = get_interaction_tree()           # [{"id": 1, "t": "btn", "l": "Submit", "r": "main"}, ...]
+click("1")                              # clicks id=1
+type_text("hello", "3")                 # types into id=3
 ```
 
-This approach lets LLMs work with web pages using minimal context while maintaining full functionality.
+## Development
+
+```sh
+uv sync
+uv run ruff check .
+uv run mypy src
+uv run pytest
+```
+
+CI runs the same three on every push / PR.
 
 ## License
 
-MIT
+MIT. See [LICENSE](./LICENSE). Upstream components remain under their original
+MIT license.
