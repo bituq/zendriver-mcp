@@ -140,7 +140,9 @@ class QueryTools(ToolBase):
         import json as _json
 
         needle = _json.dumps(filter_text or "")
-        buttons = await self.run_js(COLLECT_INTERACTIVES_JS + f"\ncollectButtons({needle})\n")
+        buttons = await self.run_js(
+            f"(() => {{\n{COLLECT_INTERACTIVES_JS}\nreturn collectButtons({needle});\n}})()"
+        )
 
         if not buttons:
             return "No buttons found" + (f" matching '{filter_text}'" if filter_text else "")
@@ -167,7 +169,9 @@ class QueryTools(ToolBase):
         import json as _json
 
         filt = _json.dumps(filter_type or "")
-        inputs = await self.run_js(COLLECT_INTERACTIVES_JS + f"\ncollectInputs({filt})\n")
+        inputs = await self.run_js(
+            f"(() => {{\n{COLLECT_INTERACTIVES_JS}\nreturn collectInputs({filt});\n}})()"
+        )
 
         if not inputs:
             return "No input fields found" + (f" of type '{filter_type}'" if filter_type else "")

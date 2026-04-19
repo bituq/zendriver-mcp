@@ -9,10 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Fixed
 - `click(text=...)`, `click_shadow`, `describe_shadow`,
   `human_click(text=...)`, `find_buttons` and `find_inputs` no longer
-  throw `SyntaxError: Illegal return statement`. The shadow-DOM JS
-  snippets were concatenated with a bare top-level `return`, which CDP
-  `Runtime.evaluate` rejects. They now end on a plain expression whose
-  completion value is what the tool reads.
+  throw `SyntaxError: Illegal return statement` on first call, nor
+  `CLICKABLE_ROLES has already been declared` on subsequent calls in
+  the same session. The shadow-DOM JS snippets are now wrapped in an
+  IIFE so both `return` is legal and the top-level `const`
+  declarations inside `FIND_INNER_CLICKABLE_JS` stay scoped to the
+  IIFE instead of leaking into the execution context's lexical env.
 - `check_visibility` also flags zero-size bounding rects as hidden.
   Pages like Outlook render multiple `[role="searchbox"]` elements; the
   hidden ones have `display: block` but a 0x0 rect. Accepting those as

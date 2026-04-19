@@ -60,7 +60,7 @@ class HumanInputTools(ToolBase):
 
             needle = _json.dumps(text)
             result = await self.run_js(
-                FIND_CLICK_COORDS_BY_TEXT_JS + f"\nfindClickCoordsByText({needle})\n"
+                f"(() => {{\n{FIND_CLICK_COORDS_BY_TEXT_JS}\nreturn findClickCoordsByText({needle});\n}})()"
             )
             if not isinstance(result, dict) or not result.get("ok"):
                 raise ElementNotFoundError(f"text={text!r}")
