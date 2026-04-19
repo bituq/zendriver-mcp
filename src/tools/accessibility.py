@@ -37,9 +37,10 @@ class AccessibilityTools(ToolBase):
         self._uids: dict[str, _UidEntry] = {}
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.get_accessibility_snapshot)
-        self._mcp.tool()(self.click_by_uid)
-        self._mcp.tool()(self.describe_uid)
+        # AX tree is slow on complex pages; 30s keeps the tool callable.
+        self._register(self.get_accessibility_snapshot, timeout=30)
+        self._register(self.click_by_uid)
+        self._register(self.describe_uid)
 
     async def get_accessibility_snapshot(
         self, max_nodes: int = 400, interesting_only: bool = True

@@ -16,10 +16,10 @@ class NetworkControlTools(ToolBase):
     """Active network controls that modify outgoing requests."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.block_urls)
-        self._mcp.tool()(self.unblock_all_urls)
-        self._mcp.tool()(self.set_extra_headers)
-        self._mcp.tool()(self.bypass_service_worker)
+        self._register(self.block_urls)
+        self._register(self.unblock_all_urls)
+        self._register(self.set_extra_headers)
+        self._register(self.bypass_service_worker)
 
     async def block_urls(self, patterns: list[str]) -> str:
         """Block subsequent requests whose URL matches one of the patterns.

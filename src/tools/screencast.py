@@ -37,10 +37,11 @@ class ScreencastTools(ToolBase):
         self._handler: FrameHandler | None = None
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.start_screencast)
-        self._mcp.tool()(self.stop_screencast)
-        self._mcp.tool()(self.export_screencast_mp4)
-        self._mcp.tool()(self.check_ffmpeg_available)
+        self._register(self.start_screencast)
+        self._register(self.stop_screencast)
+        # ffmpeg encoding of a long capture can take a while.
+        self._register(self.export_screencast_mp4, timeout=300)
+        self._register(self.check_ffmpeg_available, timeout=10)
 
     async def start_screencast(
         self,

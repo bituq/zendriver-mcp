@@ -52,10 +52,10 @@ class InterceptionTools(ToolBase):
         self._next_id = 0
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.mock_response)
-        self._mcp.tool()(self.fail_requests)
-        self._mcp.tool()(self.list_interceptions)
-        self._mcp.tool()(self.stop_interception)
+        self._register(self.mock_response)
+        self._register(self.fail_requests)
+        self._register(self.list_interceptions)
+        self._register(self.stop_interception)
 
     async def mock_response(
         self,

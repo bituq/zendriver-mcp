@@ -101,14 +101,14 @@ class EmulationTools(ToolBase):
     """Viewport, device, CPU, and network emulation via CDP."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.set_viewport)
-        self._mcp.tool()(self.restore_viewport)
-        self._mcp.tool()(self.set_device)
-        self._mcp.tool()(self.list_devices)
-        self._mcp.tool()(self.set_cpu_throttle)
-        self._mcp.tool()(self.set_network_conditions)
-        self._mcp.tool()(self.list_network_profiles)
-        self._mcp.tool()(self.emulate_media)
+        self._register(self.set_viewport)
+        self._register(self.restore_viewport)
+        self._register(self.set_device)
+        self._register(self.list_devices)
+        self._register(self.set_cpu_throttle)
+        self._register(self.set_network_conditions)
+        self._register(self.list_network_profiles)
+        self._register(self.emulate_media)
 
     async def set_viewport(
         self,

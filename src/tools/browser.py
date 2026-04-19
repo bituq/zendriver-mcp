@@ -11,9 +11,10 @@ class BrowserTools(ToolBase):
 
     def _register_tools(self) -> None:
         """register browser lifecycle tools"""
-        self._mcp.tool()(self.start_browser)
-        self._mcp.tool()(self.stop_browser)
-        self._mcp.tool()(self.get_browser_status)
+        # Cold Chrome launch can take a few seconds on first run.
+        self._register(self.start_browser, timeout=120)
+        self._register(self.stop_browser, timeout=30)
+        self._register(self.get_browser_status)
 
     async def start_browser(
         self, headless: bool = False, proxy: str | None = None, user_data_dir: str | None = None

@@ -21,13 +21,14 @@ class StealthTools(ToolBase):
     """Tools for evading bot detection and overriding browser identity."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.bypass_cloudflare)
-        self._mcp.tool()(self.is_cloudflare_challenge_present)
-        self._mcp.tool()(self.set_user_agent)
-        self._mcp.tool()(self.clear_user_agent)
-        self._mcp.tool()(self.set_locale)
-        self._mcp.tool()(self.set_timezone)
-        self._mcp.tool()(self.set_geolocation)
+        # Cloudflare solver clicks up to `timeout` seconds; give it room.
+        self._register(self.bypass_cloudflare, timeout=120)
+        self._register(self.is_cloudflare_challenge_present, timeout=15)
+        self._register(self.set_user_agent)
+        self._register(self.clear_user_agent)
+        self._register(self.set_locale)
+        self._register(self.set_timezone)
+        self._register(self.set_geolocation)
 
     async def bypass_cloudflare(
         self,

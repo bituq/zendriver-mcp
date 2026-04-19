@@ -46,3 +46,17 @@ class LighthouseNotInstalledError(ZendriverMCPError):
 
 class AccessibilityUidError(ZendriverMCPError):
     """Raised when a caller references an unknown or stale accessibility uid."""
+
+
+class ToolTimeoutError(ZendriverMCPError):
+    """Raised when a tool exceeds its time budget.
+
+    Prevents a single hung CDP command from freezing the whole MCP session.
+    Override the default via the ``ZENDRIVER_MCP_TOOL_TIMEOUT`` env var or the
+    per-tool ``timeout`` argument at registration.
+    """
+
+    def __init__(self, tool: str, seconds: float) -> None:
+        super().__init__(f"Tool {tool!r} timed out after {seconds:.1f}s")
+        self.tool = tool
+        self.seconds = seconds

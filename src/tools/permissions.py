@@ -31,9 +31,9 @@ class PermissionsTools(ToolBase):
     """Grant or reset browser permissions for an origin."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.grant_permissions)
-        self._mcp.tool()(self.reset_permissions)
-        self._mcp.tool()(self.list_permission_names)
+        self._register(self.grant_permissions)
+        self._register(self.reset_permissions)
+        self._register(self.list_permission_names)
 
     async def grant_permissions(self, permissions: list[str], origin: str | None = None) -> str:
         """Grant ``permissions`` to ``origin`` (or all origins if omitted).

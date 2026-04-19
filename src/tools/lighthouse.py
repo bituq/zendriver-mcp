@@ -30,8 +30,9 @@ class LighthouseTools(ToolBase):
     """Run Lighthouse audits against the current tab."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.run_lighthouse)
-        self._mcp.tool()(self.check_lighthouse_available)
+        # Full Lighthouse audits routinely take 60-120s; allow up to 5 min.
+        self._register(self.run_lighthouse, timeout=300)
+        self._register(self.check_lighthouse_available, timeout=10)
 
     async def check_lighthouse_available(self) -> dict[str, Any]:
         """Report whether the ``lighthouse`` CLI is installed and its version.

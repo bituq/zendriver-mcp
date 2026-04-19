@@ -16,11 +16,11 @@ class UtilityTools(ToolBase):
 
     def _register_tools(self) -> None:
         """register utility tools"""
-        self._mcp.tool()(self.screenshot)
-        self._mcp.tool()(self.execute_js)
-        self._mcp.tool()(self.wait)
-        self._mcp.tool()(self.wait_for_element)
-        self._mcp.tool()(self.run_security_audit)
+        self._register(self.screenshot)
+        self._register(self.execute_js)
+        self._register(self.wait)
+        self._register(self.wait_for_element)
+        self._register(self.run_security_audit)
 
     async def screenshot(self, save_path: str | None = None) -> Image:
         """Take a screenshot of the current page and return as viewable image.

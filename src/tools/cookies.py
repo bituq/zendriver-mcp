@@ -23,10 +23,10 @@ class CookieTools(ToolBase):
     """Full-fidelity cookie I/O, including HTTP-only cookies across all origins."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.export_cookies)
-        self._mcp.tool()(self.import_cookies)
-        self._mcp.tool()(self.clear_all_cookies)
-        self._mcp.tool()(self.list_all_cookies)
+        self._register(self.export_cookies)
+        self._register(self.import_cookies)
+        self._register(self.clear_all_cookies)
+        self._register(self.list_all_cookies)
 
     async def list_all_cookies(self) -> list[dict[str, Any]]:
         """Return every cookie the browser is holding, across all origins."""

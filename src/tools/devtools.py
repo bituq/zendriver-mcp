@@ -50,9 +50,11 @@ class DevToolsTools(ToolBase):
         self._trace_handlers: tuple[DataHandler, CompleteHandler] | None = None
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.start_trace)
-        self._mcp.tool()(self.stop_trace)
-        self._mcp.tool()(self.take_heap_snapshot)
+        self._register(self.start_trace)
+        # stop_trace waits up to 30s internally for tracingComplete; pad it.
+        self._register(self.stop_trace, timeout=120)
+        # Heap snapshots on large pages stream megabytes of chunks.
+        self._register(self.take_heap_snapshot, timeout=180)
 
     async def start_trace(self, categories: str = "") -> str:
         """Begin recording a performance trace on the current tab.

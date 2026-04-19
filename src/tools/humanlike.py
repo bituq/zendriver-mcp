@@ -20,9 +20,9 @@ class HumanInputTools(ToolBase):
     """Cursor paths and typing that look organic to bot-detection."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.human_click)
-        self._mcp.tool()(self.human_type)
-        self._mcp.tool()(self.estimated_typing_duration)
+        self._register(self.human_click)
+        self._register(self.human_type)
+        self._register(self.estimated_typing_duration)
 
     async def human_click(
         self,

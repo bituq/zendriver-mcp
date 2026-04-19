@@ -17,8 +17,9 @@ class ProxyTools(ToolBase):
     """Configure an HTTP/SOCKS proxy by restarting the browser."""
 
     def _register_tools(self) -> None:
-        self._mcp.tool()(self.configure_proxy)
-        self._mcp.tool()(self.clear_proxy)
+        # Restart flow (stop + fresh launch) can easily exceed the default.
+        self._register(self.configure_proxy, timeout=120)
+        self._register(self.clear_proxy, timeout=120)
 
     async def configure_proxy(
         self,
