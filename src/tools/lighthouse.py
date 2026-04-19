@@ -10,11 +10,9 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
-import tempfile
-import time
-from pathlib import Path
 from typing import Any
 
+from src.artifacts import resolve_artifact_path
 from src.errors import LighthouseNotInstalledError, ZendriverMCPError
 from src.tools.base import ToolBase
 
@@ -80,12 +78,9 @@ class LighthouseTools(ToolBase):
         if port is None:
             raise ZendriverMCPError("Could not determine the browser's remote debugging port.")
 
-        report_target = (
-            Path(output_path).expanduser().resolve()
-            if output_path
-            else Path(tempfile.gettempdir()) / f"lighthouse-{int(time.time())}.json"
+        report_target = resolve_artifact_path(
+            output_path, default_prefix="lighthouse", default_ext="json"
         )
-        report_target.parent.mkdir(parents=True, exist_ok=True)
 
         args = [
             binary,
@@ -96,9 +91,9 @@ class LighthouseTools(ToolBase):
             f"--form-factor={form_factor}",
             "--only-categories=" + ",".join(categories or _DEFAULT_CATEGORIES),
             "--quiet",
-            # We connect to a running browser; Lighthouse must not try to
-            # launch a new one.
-            "--chrome-flags=--headless=false",
+            # We connect to a running browser via --port; no need for
+            # --chrome-flags (Lighthouse would otherwise try to spawn a
+            # second Chrome despite the port attachment).
         ]
 
         proc = await asyncio.create_subprocess_exec(

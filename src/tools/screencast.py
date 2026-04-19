@@ -10,8 +10,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import shutil
-import tempfile
-import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -19,6 +17,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from zendriver import cdp
 
+from src.artifacts import resolve_artifact_dir, resolve_artifact_path
 from src.errors import ZendriverMCPError
 from src.response import ToolResponse
 from src.tools.base import ToolBase
@@ -71,21 +70,21 @@ class ScreencastTools(ToolBase):
         if fmt not in {"jpeg", "png"}:
             raise ZendriverMCPError(f"fmt must be 'jpeg' or 'png', got {fmt!r}")
 
-        target = (
-            Path(output_dir).expanduser().resolve()
-            if output_dir
-            else Path(tempfile.mkdtemp(prefix="zendriver-screencast-"))
-        )
-        target.mkdir(parents=True, exist_ok=True)
+        target = resolve_artifact_dir(output_dir, default_prefix="zendriver-screencast")
 
         tab = self.session.page
         extension = "jpg" if fmt == "jpeg" else "png"
 
         async def on_frame(event: cdp.page.ScreencastFrame) -> None:
-            assert self._frame_dir is not None
+            # Late straggler after stop_screencast nulled the frame dir.
+            # Drop silently rather than raising AssertionError from the
+            # Listener task.
+            frame_dir = self._frame_dir
+            if frame_dir is None:
+                return
             index = self._frame_count
             self._frame_count += 1
-            path = self._frame_dir / f"frame-{index:06d}.{extension}"
+            path = frame_dir / f"frame-{index:06d}.{extension}"
             path.write_bytes(base64.b64decode(event.data))
             # Acking tells Chrome we consumed the frame - without it the stream stalls.
             await tab.send(cdp.page.screencast_frame_ack(session_id=event.session_id))
@@ -118,18 +117,21 @@ class ScreencastTools(ToolBase):
         tab = self.session.page
         await tab.send(cdp.page.stop_screencast())
 
-        # Drain in-flight frame events before detaching the handler.
-        await asyncio.sleep(0.2)
-        handlers = tab.handlers.get(cdp.page.ScreencastFrame)
-        if handlers and self._handler in handlers:
-            handlers.remove(self._handler)
-
         directory = self._frame_dir
         frames = self._frame_count
+        handler = self._handler
+
+        # Clear the target dir *before* draining and detaching. Any
+        # straggler frame that arrives during the sleep will see
+        # _frame_dir = None and drop silently instead of asserting.
         self._frame_dir = None
         self._frame_count = 0
         self._handler = None
 
+        await asyncio.sleep(0.2)
+        handlers_list = tab.handlers.get(cdp.page.ScreencastFrame)
+        if handlers_list and handler in handlers_list:
+            handlers_list.remove(handler)
         return ToolResponse(
             summary=f"Screencast stopped: {frames} frames in {directory}",
             data={"frame_count": frames, "format": self._frame_format},
@@ -189,12 +191,9 @@ class ScreencastTools(ToolBase):
         else:
             raise ZendriverMCPError(f"No frame-*.jpg or frame-*.png files found in {src}")
 
-        target = (
-            Path(output_path).expanduser().resolve()
-            if output_path
-            else Path(tempfile.gettempdir()) / f"zendriver-screencast-{int(time.time())}.mp4"
+        target = resolve_artifact_path(
+            output_path, default_prefix="zendriver-screencast", default_ext="mp4"
         )
-        target.parent.mkdir(parents=True, exist_ok=True)
 
         args = [
             binary,

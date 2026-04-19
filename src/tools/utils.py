@@ -8,6 +8,7 @@ from datetime import datetime
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
 
+from src.artifacts import resolve_artifact_path
 from src.tools.base import ToolBase
 
 
@@ -48,18 +49,22 @@ class UtilityTools(ToolBase):
                 img.convert("RGB").save(buffer, format="JPEG", quality=60, optimize=True)
                 jpeg_data = buffer.getvalue()
 
-                # If save_path provided, save to disk
+                # If save_path provided, resolve through the sandbox then
+                # pick the format from the extension. Path sandbox rejects
+                # writes outside $HOME / tempdir / $ZENDRIVER_MCP_ARTIFACT_ROOT.
                 if save_path:
-                    # Determine format from extension
                     ext = os.path.splitext(save_path)[1].lower()
+                    default_ext = "png" if ext in {".png", ".gif", ".bmp"} else "jpg"
+                    resolved = resolve_artifact_path(
+                        save_path,
+                        default_prefix="zendriver-screenshot",
+                        default_ext=default_ext,
+                    )
                     if ext in [".png", ".gif", ".bmp"]:
-                        # Re-open original for lossless formats
                         with PILImage.open(tmp_path) as orig:
-                            orig.save(save_path)
+                            orig.save(str(resolved))
                     else:
-                        # Save as JPEG for .jpg/.jpeg or unknown
-                        with open(save_path, "wb") as f:
-                            f.write(jpeg_data)
+                        resolved.write_bytes(jpeg_data)
 
                 return Image(data=jpeg_data, format="jpeg")
         finally:

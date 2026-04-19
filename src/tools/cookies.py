@@ -14,6 +14,7 @@ from typing import Any
 
 from zendriver import cdp
 
+from src.artifacts import resolve_artifact_path
 from src.errors import ZendriverMCPError
 from src.response import ToolResponse
 from src.tools.base import ToolBase
@@ -48,9 +49,15 @@ class CookieTools(ToolBase):
         cookies = await tab.send(cdp.network.get_all_cookies()) or []
         serialised = [c.to_json() for c in cookies]
 
-        target = Path(file_path).expanduser().resolve()
-        target.parent.mkdir(parents=True, exist_ok=True)
+        target = resolve_artifact_path(
+            file_path, default_prefix="zendriver-cookies", default_ext="json"
+        )
         target.write_text(json.dumps(serialised, indent=2, sort_keys=True))
+        # Cookies contain session secrets; restrict to owner-read/write.
+        try:
+            target.chmod(0o600)
+        except OSError:
+            pass  # best-effort on platforms without POSIX perms
         return ToolResponse(
             summary=f"Exported {len(serialised)} cookies -> {target}",
             data={"count": len(serialised)},

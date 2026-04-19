@@ -3,26 +3,52 @@ import json
 
 from zendriver import cdp
 
+from src.errors import ZendriverMCPError
 from src.tools.base import ToolBase
 
-# Windows virtual-key codes for the named keys. Values sourced from
-# Chromium's ui/events/keycodes/dom/keycode_converter_data.inc.
-_KEY_METADATA: dict[str, tuple[int, str]] = {
-    "Enter": (13, "Enter"),
-    "Tab": (9, "Tab"),
-    "Escape": (27, "Escape"),
-    "Backspace": (8, "Backspace"),
-    "Delete": (46, "Delete"),
-    "ArrowUp": (38, "ArrowUp"),
-    "ArrowDown": (40, "ArrowDown"),
-    "ArrowLeft": (37, "ArrowLeft"),
-    "ArrowRight": (39, "ArrowRight"),
-    "Space": (32, "Space"),
-    " ": (32, "Space"),
-    "Home": (36, "Home"),
-    "End": (35, "End"),
-    "PageUp": (33, "PageUp"),
-    "PageDown": (34, "PageDown"),
+# Metadata for named keys: (windowsVirtualKeyCode, key/code name, text to
+# actually insert or None for non-text keys). Values sourced from Chromium's
+# ui/events/keycodes/dom/keycode_converter_data.inc.
+_NON_ALPHA_CODE: dict[str, str] = {
+    "-": "Minus",
+    "=": "Equal",
+    "[": "BracketLeft",
+    "]": "BracketRight",
+    "\\": "Backslash",
+    ";": "Semicolon",
+    "'": "Quote",
+    ",": "Comma",
+    ".": "Period",
+    "/": "Slash",
+    "`": "Backquote",
+}
+
+
+def _char_to_code(ch: str) -> str:
+    """Return the CDP ``code`` (physical key) for a single-character input."""
+    if ch.isalpha():
+        return f"Key{ch.upper()}"
+    if ch.isdigit():
+        return f"Digit{ch}"
+    return _NON_ALPHA_CODE.get(ch, ch)
+
+
+_KEY_METADATA: dict[str, tuple[int, str, str | None]] = {
+    "Enter": (13, "Enter", "\r"),
+    "Tab": (9, "Tab", "\t"),
+    "Escape": (27, "Escape", None),
+    "Backspace": (8, "Backspace", None),
+    "Delete": (46, "Delete", None),
+    "ArrowUp": (38, "ArrowUp", None),
+    "ArrowDown": (40, "ArrowDown", None),
+    "ArrowLeft": (37, "ArrowLeft", None),
+    "ArrowRight": (39, "ArrowRight", None),
+    "Space": (32, "Space", " "),
+    " ": (32, "Space", " "),
+    "Home": (36, "Home", None),
+    "End": (35, "End", None),
+    "PageUp": (33, "PageUp", None),
+    "PageDown": (34, "PageDown", None),
 }
 
 
@@ -44,7 +70,12 @@ class FormTools(ToolBase):
         caller can tell partial fills from full ones. Fields are cleared
         before typing so values don't concatenate with existing content.
         """
-        data = json.loads(form_data)
+        try:
+            data = json.loads(form_data)
+        except json.JSONDecodeError as exc:
+            raise ZendriverMCPError(f"Invalid JSON form data: {exc.msg} at char {exc.pos}") from exc
+        if not isinstance(data, dict):
+            raise ZendriverMCPError("form_data JSON must decode to an object of selector -> value")
         filled: list[str] = []
         missing: list[str] = []
 
@@ -114,44 +145,61 @@ class FormTools(ToolBase):
         meta = _KEY_METADATA.get(key)
         tab = self.session.page
         if meta is not None:
-            code, key_name = meta
-            await tab.send(
-                cdp.input_.dispatch_key_event(
-                    type_="rawKeyDown",
-                    key=key_name,
-                    code=key_name,
-                    windows_virtual_key_code=code,
-                    native_virtual_key_code=code,
+            vk, key_name, text = meta
+            # Use "keyDown" when there's text to insert (Space, Enter, Tab);
+            # ``rawKeyDown`` skips text-insertion events. For pure modifier
+            # keys (arrows, Escape, etc.) ``rawKeyDown`` is correct.
+            if text is not None:
+                await tab.send(
+                    cdp.input_.dispatch_key_event(
+                        type_="keyDown",
+                        key=key_name,
+                        code=key_name,
+                        windows_virtual_key_code=vk,
+                        native_virtual_key_code=vk,
+                        text=text,
+                        unmodified_text=text,
+                    )
                 )
-            )
+            else:
+                await tab.send(
+                    cdp.input_.dispatch_key_event(
+                        type_="rawKeyDown",
+                        key=key_name,
+                        code=key_name,
+                        windows_virtual_key_code=vk,
+                        native_virtual_key_code=vk,
+                    )
+                )
             await tab.send(
                 cdp.input_.dispatch_key_event(
                     type_="keyUp",
                     key=key_name,
                     code=key_name,
-                    windows_virtual_key_code=code,
-                    native_virtual_key_code=code,
+                    windows_virtual_key_code=vk,
+                    native_virtual_key_code=vk,
                 )
             )
         elif len(key) == 1:
+            code = _char_to_code(key)
             await tab.send(
                 cdp.input_.dispatch_key_event(
                     type_="keyDown",
                     text=key,
                     unmodified_text=key,
                     key=key,
-                    code=f"Key{key.upper()}" if key.isalpha() else key,
+                    code=code,
                 )
             )
             await tab.send(
                 cdp.input_.dispatch_key_event(
                     type_="keyUp",
                     key=key,
-                    code=f"Key{key.upper()}" if key.isalpha() else key,
+                    code=code,
                 )
             )
         else:
-            return f"Error: unknown key {key!r}"
+            raise ZendriverMCPError(f"Unknown key: {key!r}")
 
         return f"Pressed key: {key}" + (f" on {selector}" if selector else "")
 

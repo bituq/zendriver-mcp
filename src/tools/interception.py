@@ -28,6 +28,12 @@ from src.tools.base import ToolBase
 
 PausedHandler = Callable[[cdp.fetch.RequestPaused], Awaitable[None]]
 
+# Mock bodies are held entirely in memory before base64-encoding and being
+# sent over CDP. 10 MiB is comfortably larger than anything a typical API
+# would return; larger responses suggest accidental misuse or an abuse
+# attempt rather than a legitimate mock.
+_MAX_MOCK_BODY_BYTES = 10 * 1024 * 1024
+
 
 @dataclass(slots=True)
 class _Rule:
@@ -75,11 +81,14 @@ class InterceptionTools(ToolBase):
         """Return a mocked response for every request matching ``url_pattern``.
 
         ``url_pattern`` uses Unix glob syntax (``*``, ``?``), matched against
-        the full request URL. ``body`` is UTF-8 text; binary payloads not
-        supported here yet. Returns a rule id - pass it to something like
-        ``stop_interception(rule_id)`` (coming soon) or clear all via
-        ``stop_interception()`` with no argument.
+        the full request URL. ``body`` is UTF-8 text (cap: 10 MiB to prevent
+        RAM exhaustion). Returns a rule id; pass it to
+        ``stop_interception(rule_id)`` or call with no args to clear all.
         """
+        if len(body.encode("utf-8")) > _MAX_MOCK_BODY_BYTES:
+            raise ZendriverMCPError(
+                f"mock body exceeds {_MAX_MOCK_BODY_BYTES // (1024 * 1024)} MiB cap"
+            )
         rule = _Rule(
             id=self._fresh_id(),
             url_pattern=url_pattern,
@@ -198,13 +207,15 @@ class InterceptionTools(ToolBase):
 
     def _make_handler(self) -> PausedHandler:
         async def on_paused(event: cdp.fetch.RequestPaused) -> None:
-            tab = self.session.page
             url = event.request.url
-            # Snapshot the rules under the lock to avoid observing a mid-
-            # mutation state (append/pop while we iterate). We release the
-            # lock before awaiting the CDP send so concurrent callers can
-            # still add/remove rules while we're talking to Chrome.
+            # Snapshot rules AND capture the tab inside the lock - the
+            # tab reference was previously read outside, so a concurrent
+            # stop_browser could raise PageNotLoadedError here and leave
+            # the paused request stuck forever in Chrome.
             async with self._lock:
+                if not self.session.has_page():
+                    return  # browser torn down; let the paused request die
+                tab = self.session.page
                 match = next(
                     (r for r in self._rules if fnmatch.fnmatch(url, r.url_pattern)),
                     None,

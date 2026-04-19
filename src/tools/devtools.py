@@ -9,14 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import json
-import tempfile
-import time
 from collections.abc import Awaitable, Callable
-from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 from zendriver import cdp
 
+from src.artifacts import resolve_artifact_path
 from src.errors import TracingError
 from src.tools.base import ToolBase
 
@@ -153,12 +151,9 @@ class DevToolsTools(ToolBase):
             self._trace_complete = None
             self._trace_handlers = None
 
-        target = (
-            Path(file_path).expanduser().resolve()
-            if file_path
-            else Path(tempfile.gettempdir()) / f"zendriver-trace-{int(time.time())}.json"
+        target = resolve_artifact_path(
+            file_path, default_prefix="zendriver-trace", default_ext="json"
         )
-        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps({"traceEvents": events}))
         return f"Trace saved: {target} ({len(events)} events)"
 
@@ -196,11 +191,8 @@ class DevToolsTools(ToolBase):
             _safe_detach(tab, cdp.heap_profiler.AddHeapSnapshotChunk, on_chunk)
             _safe_detach(tab, cdp.heap_profiler.ReportHeapSnapshotProgress, on_progress)
 
-        target = (
-            Path(file_path).expanduser().resolve()
-            if file_path
-            else Path(tempfile.gettempdir()) / f"zendriver-heap-{int(time.time())}.heapsnapshot"
+        target = resolve_artifact_path(
+            file_path, default_prefix="zendriver-heap", default_ext="heapsnapshot"
         )
-        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("".join(chunks))
         return f"Heap snapshot saved: {target} ({len(chunks)} chunks)"

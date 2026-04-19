@@ -54,9 +54,10 @@ class ElementTools(ToolBase):
 
         await self.click(selector)
         if replace:
+            # clear_input uses elem.apply(...) which doesn't move focus, so
+            # no need to re-click here; doing so would double-fire click
+            # handlers on date-pickers, toggles, etc.
             await self.clear_input(selector)
-            # Re-focus after clearing; click() above already did.
-            await self.click(selector)
         await self.session.page.send(cdp.input_.insert_text(text=text))
         return f"Typed {len(text)} char(s) into {selector}"
 

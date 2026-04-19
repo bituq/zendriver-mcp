@@ -35,6 +35,11 @@ def _safe_transaction_call(self: _zdc.Transaction, **response: Any) -> None:
     parser is now set as the future's exception instead of propagating
     into the Listener task and leaving the caller stuck.
     """
+    # EventTransactions carry no CDP generator and should never be driven
+    # via __call__; original zendriver never does this, but guarding
+    # prevents an AttributeError if a future Listener path slips up.
+    if self.__cdp_obj__ is None:
+        return
     if "error" in response:
         self.set_exception(_zdc.ProtocolException(response["error"]))
         return

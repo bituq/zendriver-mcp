@@ -181,8 +181,13 @@ class AccessibilityTools(ToolBase):
         if not roots:
             return ToolResponse(summary="Empty accessibility tree", data={"nodes": []}).to_dict()
 
-        top = render(roots[0])
-        # Wrap in a synthetic root if the real root got filtered out.
+        # Some pages have multiple top-level AX roots (OOPIF iframes,
+        # embedded PDFs, etc.). Render every root and flatten the rendered
+        # node lists together so nothing is silently dropped.
+        top: list[dict[str, Any]] = []
+        for root in roots:
+            top.extend(render(root))
+
         if len(top) == 1:
             tree: dict[str, Any] = top[0]
         else:
