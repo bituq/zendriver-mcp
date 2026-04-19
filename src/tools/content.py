@@ -46,15 +46,22 @@ class ContentTools(ToolBase):
         except Exception as e:
             return f"Error analyzing page: {str(e)}"
 
-    async def scroll(self, direction: str = "down", amount: int = 500) -> str:
-        """Scroll the page up or down."""
+    async def scroll(self, direction: str = "down", pixels: int = 500) -> str:
+        """Scroll the page up or down by ``pixels`` (instant, not animated).
+
+        Uses JavaScript ``window.scrollBy`` directly. The earlier implementation
+        called zendriver's ``scroll_down`` which interprets its argument as a
+        *percentage* of the viewport and animates via
+        ``Input.synthesizeScrollGesture`` - turning e.g. 500 into five
+        viewport-heights of smooth scrolling.
+        """
         page = self.session.page
         if direction == "down":
-            await page.scroll_down(amount)
-            return f"Scrolled down {amount}px"
+            await page.evaluate(f"window.scrollBy(0, {int(pixels)})")
+            return f"Scrolled down {pixels}px"
         elif direction == "up":
-            await page.scroll_up(amount)
-            return f"Scrolled up {amount}px"
+            await page.evaluate(f"window.scrollBy(0, -{int(pixels)})")
+            return f"Scrolled up {pixels}px"
         return f"Invalid direction: {direction}"
 
     async def scroll_to_element(self, selector: str) -> str:
