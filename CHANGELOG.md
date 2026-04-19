@@ -4,45 +4,59 @@ All notable changes to this project will be documented here.
 Format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-04-19
 
 ### Added
 
 **Housekeeping**
-- Fork baseline with `uv` project layout, pinned to Python 3.12.
+- `uv` project layout, pinned to Python 3.12.
 - Ruff + mypy config, pytest scaffold with smoke tests.
 - GitHub Actions CI (ruff, ruff format --check, mypy, pytest).
+- `LICENSE` file (MIT) and PyPI-ready package metadata (keywords,
+  classifiers, project URLs).
+- `docs/` directory with getting-started, full tool reference, and three
+  recipe guides (login-reuse, Cloudflare, performance audit).
+- Manual integration smoke: `scripts/integration_smoke.py`.
 
-**Phase 1 - stealth + human-like input**
-- `StealthTools` module:
-  - `bypass_cloudflare`, `is_cloudflare_challenge_present`
-  - `set_user_agent`, `clear_user_agent`, `set_locale`, `set_timezone`,
-    `set_geolocation`
-- Human input primitives (`src/humaninput.py`): cubic Bezier mouse paths,
-  gaussian keystroke timing.
-- `HumanInputTools` module: `human_click`, `human_type`,
-  `estimated_typing_duration`.
+**Stealth + human-like input**
+- `StealthTools`: `bypass_cloudflare`, `is_cloudflare_challenge_present`,
+  `set_user_agent`, `clear_user_agent`, `set_locale`, `set_timezone`,
+  `set_geolocation`.
+- `HumanInputTools`: `human_click`, `human_type`,
+  `estimated_typing_duration`, built on bezier mouse paths and gaussian
+  keystroke timing primitives in `src/humaninput.py`.
 
-**Phase 2 - DevTools parity**
-- `EmulationTools` module: viewport, device profiles (iPhone 15 Pro,
-  Pixel 8, iPad Pro, Desktop 1080p), CPU throttle, network conditions
-  (offline / slow-3g / fast-3g / 4g / no-throttling), media emulation.
-- `DevToolsTools` module: `start_trace` / `stop_trace` producing DevTools-
-  loadable JSON; `take_heap_snapshot` producing `.heapsnapshot` files.
-- `LighthouseTools` module: `run_lighthouse` and
-  `check_lighthouse_available`, shelling out to the Lighthouse CLI against
-  the browser's remote debugging port.
+**DevTools parity**
+- `EmulationTools`: viewport, device profiles (iPhone 15 Pro, Pixel 8,
+  iPad Pro, Desktop 1080p), CPU throttle, network presets (offline /
+  slow-3g / fast-3g / 4g / no-throttling), `emulate_media`.
+- `DevToolsTools`: `start_trace` / `stop_trace` producing DevTools-loadable
+  JSON; `take_heap_snapshot` producing `.heapsnapshot` files.
+- `LighthouseTools`: `run_lighthouse` and `check_lighthouse_available`,
+  shelling out to the Lighthouse CLI against the browser's remote
+  debugging port.
 
-**Phase 3 - quality of life**
-- `ScreencastTools` module: `start_screencast` / `stop_screencast` using
-  CDP `Page.startScreencast` events, writing frames to disk.
-- `AccessibilityTools` module: `get_accessibility_snapshot` returns the
-  CDP AX tree keyed by stable uids, `click_by_uid` performs deterministic
+**Session + network control**
+- `CookieTools`: `export_cookies`, `import_cookies`, `list_all_cookies`,
+  `clear_all_cookies` - CDP-level, covers HTTP-only cookies and all
+  origins (upstream `storage.get_cookies` only reads `document.cookie`).
+- `NetworkControlTools`: `block_urls`, `unblock_all_urls`,
+  `set_extra_headers`, `bypass_service_worker`.
+- `PermissionsTools`: `grant_permissions`, `reset_permissions`,
+  `list_permission_names` with a curated short-name table.
+
+**Quality of life**
+- `ScreencastTools`: `start_screencast` / `stop_screencast` using CDP
+  `Page.startScreencast` events, writing frames to disk as JPEG or PNG.
+- `AccessibilityTools`: `get_accessibility_snapshot` returns the CDP AX
+  tree keyed by stable uids, `click_by_uid` performs deterministic
   interaction, `describe_uid` returns cached metadata.
 - `ToolResponse` envelope (`src/response.py`) for structured dict returns
   with `summary` / `data` / `files` keys.
 - Richer error taxonomy: `CloudflareChallengeError`, `TracingError`,
   `LighthouseNotInstalledError`, `AccessibilityUidError`.
+- Consolidated CLI in `src/server.py` with `--browser-path` and
+  `--transport` flags; `run.py` kept as a compatibility shim.
 
 ### Fixed
 - `type_text` referenced an undefined `self._tab`; now sends
@@ -51,11 +65,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ### Changed
 - `ToolBase._register_tools` is now an `@abstractmethod`, matching actual
   usage in subclasses.
+- Bumped to `0.2.0` to signal the new shape.
 
-Tool count: upstream 49 -> 77 after phases 1-3.
+Tool count: upstream 49 -> 88.
 
-## Fork origin
+## Acknowledgements
 
-Forked from [ShubhamChoulkar/Zendriver-MCP](https://github.com/ShubhamChoulkar/Zendriver-MCP)
-at commit [`main`] on 2026-04-19. See upstream for the original 49 tools
-and the token-optimised DOM walker.
+The token-optimised DOM walker and the original 49-tool foundation come from
+[ShubhamChoulkar/Zendriver-MCP](https://github.com/ShubhamChoulkar/Zendriver-MCP).
+This release takes that base and grows it into a full DevTools + stealth
+automation suite.

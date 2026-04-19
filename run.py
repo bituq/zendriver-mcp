@@ -1,20 +1,8 @@
-# Runner script for Zendriver MCP server
-import argparse
-import os
-import sys
+"""Thin compatibility shim. Prefer `uv run zendriver-mcp` or `python -m src.server`."""
 
-# Add the project directory to the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from __future__ import annotations
 
-from src.session import BrowserSession
-from src.tools import mcp
+from src.server import main
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--browser-path", help="Path to browser executable")
-    args = parser.parse_args()
-
-    if args.browser_path:
-        BrowserSession.default_browser_path = args.browser_path
-
-    mcp.run(transport="stdio")
+    main()

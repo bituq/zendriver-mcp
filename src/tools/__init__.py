@@ -5,6 +5,7 @@ from src.tools.accessibility import AccessibilityTools
 from src.tools.base import ToolBase
 from src.tools.browser import BrowserTools
 from src.tools.content import ContentTools
+from src.tools.cookies import CookieTools
 from src.tools.devtools import DevToolsTools
 from src.tools.elements import ElementTools
 from src.tools.emulation import EmulationTools
@@ -13,6 +14,8 @@ from src.tools.humanlike import HumanInputTools
 from src.tools.lighthouse import LighthouseTools
 from src.tools.logging import LoggingTools
 from src.tools.navigation import NavigationTools
+from src.tools.network_control import NetworkControlTools
+from src.tools.permissions import PermissionsTools
 from src.tools.query import QueryTools
 from src.tools.screencast import ScreencastTools
 from src.tools.stealth import StealthTools
@@ -41,6 +44,9 @@ _devtools_tools = DevToolsTools(mcp)
 _lighthouse_tools = LighthouseTools(mcp)
 _screencast_tools = ScreencastTools(mcp)
 _accessibility_tools = AccessibilityTools(mcp)
+_cookie_tools = CookieTools(mcp)
+_network_control_tools = NetworkControlTools(mcp)
+_permissions_tools = PermissionsTools(mcp)
 
 # export individual tool functions for backwards compatibility
 # browser lifecycle
@@ -154,6 +160,23 @@ get_accessibility_snapshot = _accessibility_tools.get_accessibility_snapshot
 click_by_uid = _accessibility_tools.click_by_uid
 describe_uid = _accessibility_tools.describe_uid
 
+# cookies (full fidelity, including HTTP-only)
+export_cookies = _cookie_tools.export_cookies
+import_cookies = _cookie_tools.import_cookies
+list_all_cookies = _cookie_tools.list_all_cookies
+clear_all_cookies = _cookie_tools.clear_all_cookies
+
+# network controls
+block_urls = _network_control_tools.block_urls
+unblock_all_urls = _network_control_tools.unblock_all_urls
+set_extra_headers = _network_control_tools.set_extra_headers
+bypass_service_worker = _network_control_tools.bypass_service_worker
+
+# permissions
+grant_permissions = _permissions_tools.grant_permissions
+reset_permissions = _permissions_tools.reset_permissions
+list_permission_names = _permissions_tools.list_permission_names
+
 __all__ = [
     # mcp server
     "mcp",
@@ -177,6 +200,9 @@ __all__ = [
     "LighthouseTools",
     "ScreencastTools",
     "AccessibilityTools",
+    "CookieTools",
+    "NetworkControlTools",
+    "PermissionsTools",
     # individual tool functions
     "start_browser",
     "stop_browser",
@@ -255,4 +281,15 @@ __all__ = [
     "get_accessibility_snapshot",
     "click_by_uid",
     "describe_uid",
+    "export_cookies",
+    "import_cookies",
+    "list_all_cookies",
+    "clear_all_cookies",
+    "block_urls",
+    "unblock_all_urls",
+    "set_extra_headers",
+    "bypass_service_worker",
+    "grant_permissions",
+    "reset_permissions",
+    "list_permission_names",
 ]
