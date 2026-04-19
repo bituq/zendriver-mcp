@@ -11,13 +11,17 @@ import asyncio
 import json
 import tempfile
 import time
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any
 
+from mcp.server.fastmcp import FastMCP
 from zendriver import cdp
 
-from src.errors import ZendriverMCPError
+from src.errors import TracingError
 from src.tools.base import ToolBase
+
+DataHandler = Callable[[cdp.tracing.DataCollected], Awaitable[None]]
+CompleteHandler = Callable[[cdp.tracing.TracingComplete], Awaitable[None]]
 
 # Roughly matches DevTools' default "Performance" trace profile.
 _DEFAULT_CATEGORIES = ",".join(
@@ -39,10 +43,11 @@ _DEFAULT_CATEGORIES = ",".join(
 class DevToolsTools(ToolBase):
     """Performance trace recording and heap snapshot capture."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, mcp: FastMCP) -> None:
+        super().__init__(mcp)
         self._trace_events: list[dict] | None = None
         self._trace_complete: asyncio.Event | None = None
+        self._trace_handlers: tuple[DataHandler, CompleteHandler] | None = None
 
     def _register_tools(self) -> None:
         self._mcp.tool()(self.start_trace)
@@ -91,8 +96,12 @@ class DevToolsTools(ToolBase):
         a timestamped file in the system temp directory. The output matches
         the format that Chrome DevTools' "Load profile" accepts.
         """
-        if self._trace_events is None or self._trace_complete is None:
-            raise ZendriverMCPError("No trace in progress. Call start_trace first.")
+        if (
+            self._trace_events is None
+            or self._trace_complete is None
+            or self._trace_handlers is None
+        ):
+            raise TracingError("No trace in progress. Call start_trace first.")
 
         tab = self.session.page
         await tab.send(cdp.tracing.end())
@@ -100,7 +109,7 @@ class DevToolsTools(ToolBase):
         try:
             await asyncio.wait_for(self._trace_complete.wait(), timeout=30.0)
         except TimeoutError as exc:
-            raise ZendriverMCPError("Trace did not complete within 30s") from exc
+            raise TracingError("Trace did not complete within 30s") from exc
 
         on_data, on_complete = self._trace_handlers
         tab.handlers.get(cdp.tracing.DataCollected, []).remove(on_data)
@@ -117,6 +126,7 @@ class DevToolsTools(ToolBase):
         count = len(self._trace_events)
         self._trace_events = None
         self._trace_complete = None
+        self._trace_handlers = None
         return f"Trace saved: {target} ({count} events)"
 
     async def take_heap_snapshot(self, file_path: str = "") -> str:

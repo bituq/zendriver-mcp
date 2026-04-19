@@ -13,6 +13,7 @@ from zendriver.core.cloudflare import (
     verify_cf,
 )
 
+from src.errors import CloudflareChallengeError
 from src.tools.base import ToolBase
 
 
@@ -47,7 +48,7 @@ class StealthTools(ToolBase):
                 timeout=timeout,
             )
         except TimeoutError as exc:
-            return f"Error: Cloudflare challenge not solved ({exc})"
+            raise CloudflareChallengeError(str(exc)) from exc
         return "Cloudflare challenge solved"
 
     async def is_cloudflare_challenge_present(self, timeout: float = 5.0) -> bool:

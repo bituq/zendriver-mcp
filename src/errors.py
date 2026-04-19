@@ -1,25 +1,48 @@
-# custom exceptions for Zendriver MCP server
+"""Typed exceptions raised by Zendriver MCP tools."""
+
+from __future__ import annotations
 
 
 class ZendriverMCPError(Exception):
-    # base exception for all Zendriver MCP errors
-    pass
+    """Base class for all Zendriver MCP tool errors."""
 
 
 class BrowserNotStartedError(ZendriverMCPError):
-    # raised when browser operations attempted before starting
-    def __init__(self, message: str = "Browser not started. Call start_browser first."):
+    """Raised when a tool is called before ``start_browser``."""
+
+    def __init__(self, message: str = "Browser not started. Call start_browser first.") -> None:
         super().__init__(message)
 
 
 class PageNotLoadedError(ZendriverMCPError):
-    # raised when page operations attempted before navigating
-    def __init__(self, message: str = "No page loaded. Navigate to a URL first."):
+    """Raised when a tool expects a loaded tab but the session has none."""
+
+    def __init__(self, message: str = "No page loaded. Navigate to a URL first.") -> None:
         super().__init__(message)
 
 
 class ElementNotFoundError(ZendriverMCPError):
-    # raised when element cannot be found on the page
-    def __init__(self, selector: str):
+    """Raised when a selector/text lookup yields nothing."""
+
+    def __init__(self, selector: str) -> None:
         super().__init__(f"Element not found: {selector}")
         self.selector = selector
+
+
+class CloudflareChallengeError(ZendriverMCPError):
+    """Raised when a Cloudflare challenge cannot be solved within the timeout."""
+
+
+class TracingError(ZendriverMCPError):
+    """Raised on unexpected state transitions around Tracing.* commands."""
+
+
+class LighthouseNotInstalledError(ZendriverMCPError):
+    """Raised when ``lighthouse`` CLI is missing on the PATH."""
+
+    def __init__(self) -> None:
+        super().__init__("Lighthouse CLI not found. Install with `npm i -g lighthouse`.")
+
+
+class AccessibilityUidError(ZendriverMCPError):
+    """Raised when a caller references an unknown or stale accessibility uid."""

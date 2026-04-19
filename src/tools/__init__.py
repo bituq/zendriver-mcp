@@ -1,6 +1,7 @@
 # tools package - modular browser automation tools for Zendriver MCP server
 from mcp.server.fastmcp import FastMCP
 
+from src.tools.accessibility import AccessibilityTools
 from src.tools.base import ToolBase
 from src.tools.browser import BrowserTools
 from src.tools.content import ContentTools
@@ -13,6 +14,7 @@ from src.tools.lighthouse import LighthouseTools
 from src.tools.logging import LoggingTools
 from src.tools.navigation import NavigationTools
 from src.tools.query import QueryTools
+from src.tools.screencast import ScreencastTools
 from src.tools.stealth import StealthTools
 from src.tools.storage import StorageTools
 from src.tools.tabs import TabTools
@@ -37,6 +39,8 @@ _human_input_tools = HumanInputTools(mcp)
 _emulation_tools = EmulationTools(mcp)
 _devtools_tools = DevToolsTools(mcp)
 _lighthouse_tools = LighthouseTools(mcp)
+_screencast_tools = ScreencastTools(mcp)
+_accessibility_tools = AccessibilityTools(mcp)
 
 # export individual tool functions for backwards compatibility
 # browser lifecycle
@@ -141,6 +145,15 @@ take_heap_snapshot = _devtools_tools.take_heap_snapshot
 run_lighthouse = _lighthouse_tools.run_lighthouse
 check_lighthouse_available = _lighthouse_tools.check_lighthouse_available
 
+# screencast
+start_screencast = _screencast_tools.start_screencast
+stop_screencast = _screencast_tools.stop_screencast
+
+# accessibility uids
+get_accessibility_snapshot = _accessibility_tools.get_accessibility_snapshot
+click_by_uid = _accessibility_tools.click_by_uid
+describe_uid = _accessibility_tools.describe_uid
+
 __all__ = [
     # mcp server
     "mcp",
@@ -162,6 +175,8 @@ __all__ = [
     "EmulationTools",
     "DevToolsTools",
     "LighthouseTools",
+    "ScreencastTools",
+    "AccessibilityTools",
     # individual tool functions
     "start_browser",
     "stop_browser",
@@ -235,4 +250,9 @@ __all__ = [
     "take_heap_snapshot",
     "run_lighthouse",
     "check_lighthouse_available",
+    "start_screencast",
+    "stop_screencast",
+    "get_accessibility_snapshot",
+    "click_by_uid",
+    "describe_uid",
 ]

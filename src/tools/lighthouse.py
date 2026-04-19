@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from src.errors import ZendriverMCPError
+from src.errors import LighthouseNotInstalledError, ZendriverMCPError
 from src.tools.base import ToolBase
 
 _DEFAULT_CATEGORIES = [
@@ -73,7 +73,7 @@ class LighthouseTools(ToolBase):
         """
         binary = shutil.which("lighthouse")
         if not binary:
-            raise ZendriverMCPError("Lighthouse CLI not found. Install with `npm i -g lighthouse`.")
+            raise LighthouseNotInstalledError
 
         port = self._extract_debug_port()
         if port is None:
