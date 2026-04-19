@@ -1,6 +1,6 @@
 [project]
 name = "zendriver-mcp"
-version = "0.3.1"
+version = "0.3.2"
 description = "Undetectable browser automation for LLM agents, spoken over MCP."
 readme = "README.md"
 license = { file = "LICENSE" }

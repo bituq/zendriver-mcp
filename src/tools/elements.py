@@ -3,6 +3,7 @@
 from zendriver import cdp
 
 from src.errors import ElementNotFoundError
+from src.tools._shadow_js import CLICK_BY_TEXT_SHADOW_JS, CLICK_SHADOW_HOST_JS
 from src.tools.base import ZENDRIVER_ID_ATTR, ToolBase
 
 
@@ -12,6 +13,7 @@ class ElementTools(ToolBase):
     def _register_tools(self) -> None:
         """register element interaction tools"""
         self._register(self.click)
+        self._register(self.click_shadow)
         self._register(self.type_text)
         self._register(self.clear_input)
         self._register(self.focus_element)
@@ -41,10 +43,57 @@ class ElementTools(ToolBase):
                 return f"Clicked: {selector}"
             raise ElementNotFoundError(selector)
         elif text:
-            elem = await self.get_element_by_text(text)
-            await elem.click()
-            return f"Clicked: {text}"
+            # Shadow-DOM-aware click: walks light + every open shadow root,
+            # picks the tightest text match, climbs/dives to the deepest
+            # interactive element (button, role=radio, custom-element
+            # inner control) and dispatches a composed click sequence.
+            # Design-system pages (e.g. NS.nl, bunq) wrap their real
+            # interactive elements multiple shadow roots deep; a plain
+            # Element.click() on the outer host never fires the handler.
+            import json as _json
+
+            safe_text = _json.dumps(text)
+            result = await self.run_js(
+                CLICK_BY_TEXT_SHADOW_JS + f"\nreturn clickByTextShadow({safe_text});\n"
+            )
+            if not isinstance(result, dict) or not result.get("ok"):
+                raise ElementNotFoundError(f"text={text!r}")
+            suffix = (
+                f" [shadow depth {result['shadow_depth']}]" if result.get("shadow_depth") else ""
+            )
+            return f"Clicked: {text}{suffix} (<{result['tag']}>)"
         return "Error: Provide selector or text"
+
+    async def click_shadow(self, selector: str, max_depth: int = 6) -> str:
+        """Click the deepest interactive element inside a custom element's shadow DOM.
+
+        Use when a page wraps a real ``<button>`` / ``[role="radio"]`` /
+        ``[role="checkbox"]`` in one or more open shadow roots
+        (``<nes-button>``, ``<sds-radio>``, ``<lion-input>`` and friends).
+        ``selector`` should match the outer custom element in the light
+        DOM; this tool then recurses through every nested ``shadowRoot``
+        up to ``max_depth`` levels and dispatches a composed click
+        sequence on the first interactive descendant it finds.
+
+        Returns an error when the host isn't found or no inner interactive
+        element lives inside its shadow tree.
+        """
+        import json as _json
+
+        selector = self.resolve_selector(selector)
+        safe_sel = _json.dumps(selector)
+        result = await self.run_js(
+            CLICK_SHADOW_HOST_JS + f"\nreturn clickShadowHost({safe_sel}, {int(max_depth)});\n"
+        )
+        if not isinstance(result, dict) or not result.get("ok"):
+            reason = result.get("reason") if isinstance(result, dict) else "unknown"
+            if reason == "host_not_found":
+                raise ElementNotFoundError(selector)
+            return f"Error: no interactive element inside {selector} ({reason})"
+        tag = result["tag"]
+        role = result.get("role")
+        role_info = f" role={role}" if role else ""
+        return f"Shadow-clicked: <{tag}{role_info}> inside {selector}"
 
     async def type_text(self, text: str, selector: str, replace: bool = True) -> str:
         """Focus an element and type ``text`` via CDP Input.insertText.

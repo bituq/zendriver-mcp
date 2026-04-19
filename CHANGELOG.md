@@ -6,6 +6,40 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-04-19
+
+### Added
+- `click_shadow(selector, max_depth=6)` tool: given a custom element's
+  light-DOM selector, recurses through every nested ``shadowRoot`` and
+  dispatches a composed click on the first interactive descendant it
+  finds. For design systems like NS's ``nes-*`` library where the real
+  ``<button>`` / ``[role="radio"]`` lives two or three shadow roots
+  deep inside ``<nes-selectable-radio>``, ``<nes-radio-button-group>``
+  and friends.
+
+### Fixed
+- `click(text="...")` is now shadow-DOM aware. Previously ``page.find``
+  would hit the outer custom element, ``Element.click()`` fired on the
+  host and the inner handler never ran; the tool reported "Clicked"
+  while nothing actually happened on the page (classic false positive
+  on sites like NS.nl and bunq). The new path walks light + every open
+  shadow root, picks the tightest text match, climbs to a clickable
+  ancestor OR dives into nested shadow roots for the real interactive
+  element, and dispatches a composed ``pointer*``/``mouse*``/``click``
+  sequence.
+- `find_buttons` and `find_inputs` walk open shadow roots too. Custom
+  elements (``<nes-button>``, ``<sds-cta>``, ``<lion-input>``) are
+  emitted with a ``(custom)`` marker so the agent knows to use
+  ``click_shadow`` when the host's own click handler is insufficient.
+  Recognised roles expanded to match ARIA: ``button``, ``link``,
+  ``checkbox``, ``radio``, ``switch``, ``menuitem``,
+  ``menuitemcheckbox``, ``menuitemradio``, ``tab``, ``option``,
+  ``treeitem``.
+- Shadow-piercing helper JS extracted to ``src/tools/_shadow_js.py``
+  so the walker / dispatcher / clickable-detector live in one place.
+
+Tool count: 96 -> 97.
+
 ## [0.3.1] - 2026-04-19
 
 ### Added
