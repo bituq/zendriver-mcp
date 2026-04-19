@@ -84,47 +84,41 @@ class LoggingTools(ToolBase):
     async def wait_for_request(
         self, url_pattern: str, timeout: float = 30.0, method: str | None = None
     ) -> str:
-        """Wait for a specific network request to complete.
+        """Wait for a matching request to **complete** (response received).
 
-        Args:
-            url_pattern: Substring to match in the URL (e.g., '/api/search', 'graphql')
-            timeout: Maximum time to wait in seconds
-            method: Optional HTTP method filter ('GET', 'POST', etc.)
-
-        Returns info about the matching request when found.
+        Only log entries with a resolved status code are considered, so this
+        returns after the server replied, not the moment Chrome sent the
+        request. ``url_pattern`` is a case-insensitive substring of the full
+        URL; ``method`` optionally filters on HTTP verb.
         """
         start = time.time()
-        seen_requests = set()
         safe_pattern = url_pattern.lower()
         safe_method = method.upper() if method else None
+        start_count = len(self.session.get_network_logs(2000))
 
         while time.time() - start < timeout:
-            logs = self.session.get_network_logs(200)
-
+            # Only look at log entries that arrived after we started waiting
+            # so stale history doesn't satisfy the wait.
+            logs = self.session.get_network_logs(2000)[start_count:]
             for log in logs:
-                # create unique id for this request
-                req_id = f"{log.get('method', '')}:{log.get('url', '')}:{log.get('timestamp', '')}"
-                if req_id in seen_requests:
-                    continue
-                seen_requests.add(req_id)
-
                 url = log.get("url", "").lower()
+                status = log.get("status", 0)
+                # Need a real response (non-zero status or FAILED sentinel)
+                # to consider the request "completed".
+                if not status or status == "?":
+                    continue
+                if safe_pattern not in url:
+                    continue
                 req_method = log.get("method", "GET")
-
-                # check if this request matches our pattern
-                if safe_pattern in url:
-                    if safe_method and req_method != safe_method:
-                        continue
-
-                    status = log.get("status", "?")
-                    elapsed = time.time() - start
-                    return (
-                        f"Found matching request after {elapsed:.1f}s:\n"
-                        f"  {req_method} {log.get('url', '')[:100]}\n"
-                        f"  Status: {status}\n"
-                        f"  Type: {log.get('type', 'unknown')}"
-                    )
-
+                if safe_method and req_method != safe_method:
+                    continue
+                elapsed = time.time() - start
+                return (
+                    f"Found matching request after {elapsed:.1f}s:\n"
+                    f"  {req_method} {log.get('url', '')[:100]}\n"
+                    f"  Status: {status}\n"
+                    f"  Type: {log.get('type', 'unknown')}"
+                )
             await self.session.page.wait(0.2)
 
-        return f"Timeout: No request matching '{url_pattern}' found after {timeout}s"
+        return f"Timeout: No completed request matching '{url_pattern}' found after {timeout}s"

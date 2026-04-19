@@ -31,7 +31,7 @@ class ElementTools(ToolBase):
                 raise ElementNotFoundError(selector)
             if check.get("hidden"):
                 return f"Error: Element '{selector}' is hidden. Cannot click."
-            elem = await self.session.page.select(selector)
+            elem = await self.try_select(selector)
             if elem:
                 await elem.click()
                 return f"Clicked: {selector}"
@@ -42,33 +42,54 @@ class ElementTools(ToolBase):
             return f"Clicked: {text}"
         return "Error: Provide selector or text"
 
-    async def type_text(self, text: str, selector: str) -> str:
-        """Type text into an element using CDP Input.insertText (no JS)."""
+    async def type_text(self, text: str, selector: str, replace: bool = True) -> str:
+        """Focus an element and type ``text`` via CDP Input.insertText.
 
-        # Make selector consistent
+        By default the field is cleared first (``replace=True``). Set
+        ``replace=False`` to append to the existing value - useful for
+        adding to a partially-filled input without retyping it.
+        """
         if selector.isdigit():
             selector = f'[data-zendriver-id="{selector}"]'
 
-        # Focus the element by clicking it
         await self.click(selector)
-
-        # Insert text via CDP Input.insertText (no JS, survives contenteditable)
+        if replace:
+            await self.clear_input(selector)
+            # Re-focus after clearing; click() above already did.
+            await self.click(selector)
         await self.session.page.send(cdp.input_.insert_text(text=text))
-
-        return f"Typed into {selector}"
+        return f"Typed {len(text)} char(s) into {selector}"
 
     async def clear_input(self, selector: str) -> str:
-        """Clear an input field or contenteditable element."""
+        """Clear an input or contenteditable element via the native setter.
+
+        Uses the same technique React's synthetic-event system expects so
+        controlled components actually see the change. Previously we called
+        ``document.execCommand`` which is deprecated and invisible to
+        React/Vue/Angular state.
+        """
         if selector.isdigit():
             selector = f'[data-zendriver-id="{selector}"]'
 
-        elem = await self.session.page.select(selector)
-        if not elem:
-            return f"Error: Element not found - {selector}"
-
-        # Select all and delete
+        elem = await self.get_element(selector)
         await elem.apply(
-            "(el) => { el.focus(); document.execCommand('selectAll'); document.execCommand('delete'); }"
+            """
+            (el) => {
+                const tag = el.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA') {
+                    const proto = tag === 'INPUT'
+                        ? window.HTMLInputElement.prototype
+                        : window.HTMLTextAreaElement.prototype;
+                    const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+                    setter.call(el, '');
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                } else if (el.isContentEditable) {
+                    el.textContent = '';
+                    el.dispatchEvent(new InputEvent('input', { bubbles: true }));
+                }
+            }
+            """
         )
         return f"Cleared: {selector}"
 

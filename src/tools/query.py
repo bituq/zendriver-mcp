@@ -84,19 +84,32 @@ class QueryTools(ToolBase):
         return "Error: Provide selector or text"
 
     async def find_all_elements(self, selector: str, limit: int = 20) -> str:
-        """Find all elements matching a selector."""
-        elems = await self.session.page.select_all(selector)
+        """Find all elements matching a selector. Returns quickly on no match.
+
+        ``limit`` caps the number of summary rows; the total count is always
+        accurate. Zendriver's ``select_all`` raises ``TimeoutError`` after
+        ~10s on zero matches, which we catch and translate to a clean
+        "no elements found" message.
+        """
+        import asyncio as _asyncio
+
+        try:
+            elems = await self.session.page.select_all(selector, timeout=2)
+        except _asyncio.TimeoutError:
+            return f"No elements found: {selector}"
         if not elems:
             return f"No elements found: {selector}"
 
+        total = len(elems)
+        shown = min(total, limit)
         results = []
-        for i, elem in enumerate(elems[:limit]):
+        for i, elem in enumerate(elems[:shown]):
             tag = getattr(elem, "tag_name", "unknown")
             text = (getattr(elem, "text", "") or "")[:50]
             results.append(f"{i + 1}. <{tag}> {text}")
 
-        total, shown = len(elems), min(len(elems), limit)
-        return f"Found {total} element(s) (showing {shown}):\n" + "\n".join(results)
+        suffix = f" (showing {shown} of {total})" if total > shown else ""
+        return f"Found {total} element(s){suffix}:\n" + "\n".join(results)
 
     async def get_element_text(self, selector: str) -> str:
         """Get the text content of an element."""

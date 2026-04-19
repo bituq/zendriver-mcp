@@ -61,9 +61,13 @@ class AccessibilityTools(ToolBase):
 
     def __init__(self, mcp: FastMCP) -> None:
         super().__init__(mcp)
-        # Uid -> metadata. Lives for the session; entries become stale if the
-        # underlying backend node is removed from the DOM.
+        # Uid -> metadata. Cleared on session reset so old backendDOMNodeIds
+        # from a dead browser don't map to random nodes in the new session.
         self._uids: dict[str, _UidEntry] = {}
+        self._session.register_reset_callback(self._reset_state)
+
+    def _reset_state(self) -> None:
+        self._uids.clear()
 
     def _register_tools(self) -> None:
         # AX tree is slow on complex pages; 30s keeps the tool callable.
@@ -89,7 +93,15 @@ class AccessibilityTools(ToolBase):
         await tab.send(cdp.accessibility.enable())
         raw_nodes: list[dict[str, Any]] = await tab.send(_raw_get_full_ax_tree())
 
+        # Stable uids: reuse the existing uid for a backend_node_id that's
+        # still live, so agents can keep a uid between snapshots. Build a
+        # lookup of backend_node_id -> uid from the previous cache before
+        # rebuilding.
+        prev_by_backend: dict[int, str] = {
+            entry.backend_node_id: uid for uid, entry in self._uids.items() if entry.backend_node_id
+        }
         self._uids.clear()
+
         by_id: dict[str, dict[str, Any]] = {
             str(node.get("nodeId")): node for node in raw_nodes if node.get("nodeId") is not None
         }
@@ -157,7 +169,9 @@ class AccessibilityTools(ToolBase):
             if len(self._uids) >= max_nodes:
                 return rendered_children
 
-            uid = f"ax_{uuid4().hex[:8]}"
+            # Reuse the previous snapshot's uid for this backend_node_id
+            # whenever possible so agents can cache uids across snapshots.
+            uid = prev_by_backend.get(backend_id) or f"ax_{uuid4().hex[:8]}"
             self._uids[uid] = _UidEntry(backend_node_id=backend_id, role=role, name=name)
             entry: dict[str, Any] = {"uid": uid, "role": role, "name": name}
             if rendered_children:

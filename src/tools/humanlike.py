@@ -6,7 +6,6 @@ wrapping the low-level primitives in ``src.humaninput``.
 
 from __future__ import annotations
 
-from src.errors import ElementNotFoundError
 from src.humaninput import (
     Point,
     human_click,
@@ -39,9 +38,7 @@ class HumanInputTools(ToolBase):
         if selector:
             if selector.isdigit():
                 selector = f'[data-zendriver-id="{selector}"]'
-            elem = await self.session.page.select(selector)
-            if elem is None:
-                raise ElementNotFoundError(selector)
+            elem = await self.get_element(selector)
         elif text:
             elem = await self.get_element_by_text(text)
         else:

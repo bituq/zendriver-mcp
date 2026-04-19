@@ -50,6 +50,14 @@ class InterceptionTools(ToolBase):
         self._handler: PausedHandler | None = None
         self._lock = asyncio.Lock()
         self._next_id = 0
+        # Session resets wipe our per-browser state so the next start_browser
+        # starts clean instead of silently no-op'ing interception.
+        self._session.register_reset_callback(self._reset_state)
+
+    def _reset_state(self) -> None:
+        self._rules = []
+        self._handler = None
+        self._next_id = 0
 
     def _register_tools(self) -> None:
         self._register(self.mock_response)
@@ -174,14 +182,17 @@ class InterceptionTools(ToolBase):
     async def _disable(self) -> None:
         if self._handler is None:
             return
+        if not self.session.has_page():
+            self._handler = None
+            return
         tab = self.session.page
-        handlers = tab.handlers.get(cdp.fetch.RequestPaused, [])
-        if self._handler in handlers:
+        handlers = tab.handlers.get(cdp.fetch.RequestPaused)
+        if handlers and self._handler in handlers:
             handlers.remove(self._handler)
         try:
             await tab.send(cdp.fetch.disable())
         except Exception:
-            # Tab may have closed; fine, Fetch state goes with it.
+            # Tab may have closed; Fetch state goes with it.
             pass
         self._handler = None
 
@@ -189,15 +200,22 @@ class InterceptionTools(ToolBase):
         async def on_paused(event: cdp.fetch.RequestPaused) -> None:
             tab = self.session.page
             url = event.request.url
-            match = next(
-                (r for r in self._rules if fnmatch.fnmatch(url, r.url_pattern)),
-                None,
-            )
+            # Snapshot the rules under the lock to avoid observing a mid-
+            # mutation state (append/pop while we iterate). We release the
+            # lock before awaiting the CDP send so concurrent callers can
+            # still add/remove rules while we're talking to Chrome.
+            async with self._lock:
+                match = next(
+                    (r for r in self._rules if fnmatch.fnmatch(url, r.url_pattern)),
+                    None,
+                )
+                if match is not None:
+                    match.match_count += 1
+
             if match is None:
                 await tab.send(cdp.fetch.continue_request(request_id=event.request_id))
                 return
 
-            match.match_count += 1
             if match.action == "fail":
                 await tab.send(
                     cdp.fetch.fail_request(

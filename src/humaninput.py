@@ -76,6 +76,18 @@ def bezier_path(
     return points
 
 
+_CURSOR_ATTR = "_zendriver_mcp_cursor"
+
+
+def get_last_cursor(tab: Tab) -> Point:
+    """Return the last cursor position recorded on ``tab``, or the origin."""
+    return getattr(tab, _CURSOR_ATTR, Point(0, 0))
+
+
+def set_last_cursor(tab: Tab, point: Point) -> None:
+    setattr(tab, _CURSOR_ATTR, point)
+
+
 async def move_mouse(
     tab: Tab,
     end: Point,
@@ -83,14 +95,21 @@ async def move_mouse(
     duration: float = _DEFAULT_MOUSE_DURATION,
     rng: random.Random | None = None,
 ) -> None:
-    """Move the mouse along a humanish path, dispatching mousemove events."""
-    start = start or Point(0, 0)
+    """Move the mouse along a humanish path, dispatching mousemove events.
+
+    Starts from the last known cursor position cached on the ``tab`` (or
+    the explicit ``start`` argument) - so consecutive ``human_click``s
+    don't teleport the cursor back to (0,0) between calls.
+    """
+    if start is None:
+        start = get_last_cursor(tab)
     steps = max(_MIN_MOUSE_STEPS, int(duration * 180))
     path = bezier_path(start, end, steps=steps, rng=rng)
     per_step = duration / len(path)
     for point in path:
         await tab.send(cdp.input_.dispatch_mouse_event(type_="mouseMoved", x=point.x, y=point.y))
         await asyncio.sleep(per_step)
+    set_last_cursor(tab, end)
 
 
 async def human_click(

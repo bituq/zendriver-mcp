@@ -15,12 +15,22 @@ class StorageTools(ToolBase):
         self._register(self.clear_storage)
 
     async def get_cookies(self) -> str:
-        """Get all cookies for the current page."""
+        """Read ``document.cookie`` for the current origin only.
+
+        Intentionally limited: HTTP-only and other-origin cookies are
+        invisible here. For full-fidelity cookie access use
+        ``list_all_cookies`` / ``export_cookies`` from the ``cookies``
+        module instead.
+        """
         cookies = await self.run_js("document.cookie")
         return cookies if cookies else "(no cookies)"
 
     async def set_cookie(self, name: str, value: str, domain: str | None = None) -> str:
-        """Set a cookie."""
+        """Set a cookie via ``document.cookie`` (limited to current origin).
+
+        Cannot set HTTP-only or cross-origin cookies. Prefer
+        ``import_cookies`` for restoring full sessions across origins.
+        """
         safe_name = self.escape_js_string(name)
         safe_value = self.escape_js_string(value)
         cookie_str = f"{safe_name}={safe_value}"

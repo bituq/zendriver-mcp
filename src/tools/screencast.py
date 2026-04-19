@@ -35,6 +35,14 @@ class ScreencastTools(ToolBase):
         self._frame_count = 0
         self._frame_format = "jpeg"
         self._handler: FrameHandler | None = None
+        # When the browser dies mid-recording, drop the handles so the next
+        # start_screencast doesn't raise "already running" on a ghost session.
+        self._session.register_reset_callback(self._reset_state)
+
+    def _reset_state(self) -> None:
+        self._frame_dir = None
+        self._frame_count = 0
+        self._handler = None
 
     def _register_tools(self) -> None:
         self._register(self.start_screencast)
@@ -112,7 +120,9 @@ class ScreencastTools(ToolBase):
 
         # Drain in-flight frame events before detaching the handler.
         await asyncio.sleep(0.2)
-        tab.handlers.get(cdp.page.ScreencastFrame, []).remove(self._handler)
+        handlers = tab.handlers.get(cdp.page.ScreencastFrame)
+        if handlers and self._handler in handlers:
+            handlers.remove(self._handler)
 
         directory = self._frame_dir
         frames = self._frame_count

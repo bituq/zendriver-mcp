@@ -8,6 +8,8 @@
 from src import compat  # noqa: F401, I001
 
 # ruff: isort: on
+import logging
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
@@ -15,6 +17,13 @@ import zendriver as zd
 from zendriver import cdp
 
 from src.errors import BrowserNotStartedError, PageNotLoadedError
+
+logger = logging.getLogger(__name__)
+
+# A reset callback is invoked on every stop_browser and again at start to
+# clear any session-bound state a tool was holding (interception handlers,
+# accessibility uid tables, trace buffers, screencast handles, ...).
+ResetCallback = Callable[[], None]
 
 
 class BrowserSession:
@@ -30,6 +39,7 @@ class BrowserSession:
     _console_logs: list[dict[str, Any]] = []
     _pending_requests: dict[str, dict[str, Any]] = {}
     _cdp_enabled_tabs: dict[int, bool] = {}  # Track tabs with CDP listeners
+    _reset_callbacks: list[ResetCallback] = []
 
     def __new__(cls) -> "BrowserSession":
         if cls._instance is None:
@@ -39,7 +49,24 @@ class BrowserSession:
             cls._console_logs = []
             cls._pending_requests = {}
             cls._cdp_enabled_tabs = {}
+            cls._reset_callbacks = []
         return cls._instance
+
+    def register_reset_callback(self, callback: ResetCallback) -> None:
+        """Register a zero-arg callback that clears a tool's session state.
+
+        Called once during ``stop_browser`` so the next session starts
+        clean. Tools should register from their ``__init__``.
+        """
+        if callback not in self._reset_callbacks:
+            self._reset_callbacks.append(callback)
+
+    def _run_reset_callbacks(self) -> None:
+        for cb in self._reset_callbacks:
+            try:
+                cb()
+            except Exception:  # noqa: BLE001 - one bad tool shouldn't block the rest
+                logger.exception("reset callback failed: %r", cb)
 
     @classmethod
     def get_instance(cls) -> "BrowserSession":
@@ -110,14 +137,17 @@ class BrowserSession:
     async def stop(self) -> None:
         """Stop the browser and clean up."""
         if self._browser is not None:
-            await self._browser.stop()
-            self._browser = None
-            self._page = None
-            self._tabs = {}
-            self._network_logs = []
-            self._console_logs = []
-            self._pending_requests = {}
-            self._cdp_enabled_tabs = {}
+            try:
+                await self._browser.stop()
+            finally:
+                self._browser = None
+                self._page = None
+                self._tabs = {}
+                self._network_logs = []
+                self._console_logs = []
+                self._pending_requests = {}
+                self._cdp_enabled_tabs = {}
+                self._run_reset_callbacks()
 
     async def _setup_cdp_listeners(self, tab: zd.Tab) -> None:
         """Set up CDP event listeners for network and console logging."""

@@ -23,6 +23,20 @@ from src.tools.base import ToolBase
 DataHandler = Callable[[cdp.tracing.DataCollected], Awaitable[None]]
 CompleteHandler = Callable[[cdp.tracing.TracingComplete], Awaitable[None]]
 
+
+def _safe_detach(tab: object, event_type: type, handler: object) -> None:
+    """Remove ``handler`` from ``tab.handlers[event_type]`` without raising.
+
+    ``tab.handlers.get(x, []).remove(...)`` returns a throwaway list on a
+    missing key, so the removal silently no-ops in that case; and calling
+    ``.remove()`` on a list that doesn't hold ``handler`` would raise
+    ``ValueError``. Both are tolerated here.
+    """
+    handlers: list = getattr(tab, "handlers", {}).get(event_type)  # type: ignore[assignment]
+    if handlers and handler in handlers:
+        handlers.remove(handler)
+
+
 # Roughly matches DevTools' default "Performance" trace profile.
 _DEFAULT_CATEGORIES = ",".join(
     [
@@ -48,6 +62,15 @@ class DevToolsTools(ToolBase):
         self._trace_events: list[dict] | None = None
         self._trace_complete: asyncio.Event | None = None
         self._trace_handlers: tuple[DataHandler, CompleteHandler] | None = None
+        # stop_browser wipes the browser; drop any in-flight trace state so
+        # the next start_trace can succeed instead of seeing "already in
+        # progress" from the dead session.
+        self._session.register_reset_callback(self._reset_state)
+
+    def _reset_state(self) -> None:
+        self._trace_events = None
+        self._trace_complete = None
+        self._trace_handlers = None
 
     def _register_tools(self) -> None:
         self._register(self.start_trace)
@@ -97,6 +120,11 @@ class DevToolsTools(ToolBase):
         Returns the absolute file path. If ``file_path`` is empty, writes to
         a timestamped file in the system temp directory. The output matches
         the format that Chrome DevTools' "Load profile" accepts.
+
+        Handlers and state are cleared via ``finally`` so a failed
+        ``tracing.end()`` or a late ``tracingComplete`` never leaves the
+        tool stuck on "a trace is already in progress" for the rest of the
+        process.
         """
         if (
             self._trace_events is None
@@ -105,17 +133,25 @@ class DevToolsTools(ToolBase):
         ):
             raise TracingError("No trace in progress. Call start_trace first.")
 
+        events = self._trace_events
+        complete = self._trace_complete
+        on_data, on_complete = self._trace_handlers
         tab = self.session.page
-        await tab.send(cdp.tracing.end())
 
         try:
-            await asyncio.wait_for(self._trace_complete.wait(), timeout=30.0)
-        except TimeoutError as exc:
-            raise TracingError("Trace did not complete within 30s") from exc
-
-        on_data, on_complete = self._trace_handlers
-        tab.handlers.get(cdp.tracing.DataCollected, []).remove(on_data)
-        tab.handlers.get(cdp.tracing.TracingComplete, []).remove(on_complete)
+            await tab.send(cdp.tracing.end())
+            try:
+                await asyncio.wait_for(complete.wait(), timeout=30.0)
+            except TimeoutError as exc:
+                raise TracingError("Trace did not complete within 30s") from exc
+        finally:
+            # Drop handlers whether we succeeded or failed; either way the
+            # tool is no longer mid-trace.
+            _safe_detach(tab, cdp.tracing.DataCollected, on_data)
+            _safe_detach(tab, cdp.tracing.TracingComplete, on_complete)
+            self._trace_events = None
+            self._trace_complete = None
+            self._trace_handlers = None
 
         target = (
             Path(file_path).expanduser().resolve()
@@ -123,13 +159,8 @@ class DevToolsTools(ToolBase):
             else Path(tempfile.gettempdir()) / f"zendriver-trace-{int(time.time())}.json"
         )
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps({"traceEvents": self._trace_events}))
-
-        count = len(self._trace_events)
-        self._trace_events = None
-        self._trace_complete = None
-        self._trace_handlers = None
-        return f"Trace saved: {target} ({count} events)"
+        target.write_text(json.dumps({"traceEvents": events}))
+        return f"Trace saved: {target} ({len(events)} events)"
 
     async def take_heap_snapshot(self, file_path: str = "") -> str:
         """Capture a V8 heap snapshot and write it to disk.
@@ -162,8 +193,8 @@ class DevToolsTools(ToolBase):
             except TimeoutError:
                 pass  # some Chrome versions don't emit the final progress event
         finally:
-            tab.handlers.get(cdp.heap_profiler.AddHeapSnapshotChunk, []).remove(on_chunk)
-            tab.handlers.get(cdp.heap_profiler.ReportHeapSnapshotProgress, []).remove(on_progress)
+            _safe_detach(tab, cdp.heap_profiler.AddHeapSnapshotChunk, on_chunk)
+            _safe_detach(tab, cdp.heap_profiler.ReportHeapSnapshotProgress, on_progress)
 
         target = (
             Path(file_path).expanduser().resolve()

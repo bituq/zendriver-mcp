@@ -65,9 +65,16 @@ class ContentTools(ToolBase):
         return f"Invalid direction: {direction}"
 
     async def scroll_to_element(self, selector: str) -> str:
-        """Scroll to bring an element into view."""
+        """Scroll to bring an element into view, or raise if it's missing.
+
+        Honest success / failure reporting: if no element matches the
+        selector we raise ``ElementNotFoundError`` instead of silently
+        no-op'ing with a fake "Scrolled to: ..." message.
+        """
+        await self.get_element(selector)
         safe_sel = self.escape_js_string(selector)
         await self.run_js(
-            f'document.querySelector("{safe_sel}")?.scrollIntoView({{behavior: "smooth", block: "center"}})'
+            f'document.querySelector("{safe_sel}")'
+            f'?.scrollIntoView({{behavior: "smooth", block: "center"}})'
         )
         return f"Scrolled to: {selector}"

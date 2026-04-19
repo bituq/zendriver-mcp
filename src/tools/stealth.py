@@ -82,9 +82,25 @@ class StealthTools(ToolBase):
         return f"User-Agent overridden: {user_agent}"
 
     async def clear_user_agent(self) -> str:
-        """Remove a previous User-Agent override and restore the default."""
-        await self.session.page.send(cdp.network.set_user_agent_override(user_agent=""))
-        return "User-Agent override cleared"
+        """Remove the override and restore the browser's real User-Agent.
+
+        CDP ``setUserAgentOverride`` has no explicit "clear" command - and
+        sending an empty string makes Chrome actually send ``User-Agent:``
+        (empty), which is *more* fingerprintable than the real UA. Instead
+        we query ``navigator.userAgent`` from a fresh evaluation (Chrome
+        returns the real UA there, not the override) and set that back.
+        """
+        page = self.session.page
+        # Chrome's navigator.userAgent reflects the overridden UA, so we
+        # need the authoritative Browser.getVersion which returns the
+        # real UA string regardless of overrides.
+        connection = self.session.browser.connection
+        if connection is None:
+            return "Browser has no active connection"
+        # get_version returns (protocolVersion, product, revision, userAgent, jsVersion)
+        _, _, _, real_ua, _ = await connection.send(cdp.browser.get_version())
+        await page.send(cdp.network.set_user_agent_override(user_agent=real_ua))
+        return f"User-Agent restored to default: {real_ua[:80]}"
 
     async def set_locale(self, locale: str) -> str:
         """Override the browser locale (ICU C-style, e.g. ``nl_NL``, ``en_US``).

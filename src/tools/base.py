@@ -64,6 +64,11 @@ class ToolBase(ABC):
         # Preserve the original signature so FastMCP still introspects the
         # right schema; wait_for+wraps keeps the coroutine type alive.
         guarded.__signature__ = inspect.signature(fn)  # type: ignore[attr-defined]
+        # Delete __wrapped__ so FastMCP's introspection doesn't follow it
+        # back to the unbound function (which would expose `self` in the
+        # schema and make the tool uncallable from the client).
+        if hasattr(guarded, "__wrapped__"):
+            delattr(guarded, "__wrapped__")
         # Marker so tests and tooling can verify the guard is in place.
         guarded.__zendriver_timeout__ = budget  # type: ignore[attr-defined]
         self._mcp.tool()(guarded)
@@ -89,19 +94,36 @@ class ToolBase(ABC):
             .replace("\r", "\\r")
         )
 
-    async def get_element(self, selector: str):
-        """get element by selector, raise error if not found"""
-        elem = await self._session.page.select(selector)
-        if elem is None:
-            raise ElementNotFoundError(selector)
-        return elem
+    async def get_element(self, selector: str, timeout: float = 2.0):
+        """Get element by selector or raise ``ElementNotFoundError`` fast.
 
-    async def get_element_by_text(self, text: str):
-        """get element by text content, raise error if not found"""
-        elem = await self._session.page.find(text, best_match=True)
-        if elem is None:
-            raise ElementNotFoundError(f"text='{text}'")
-        return elem
+        Zendriver's ``page.select`` raises ``asyncio.TimeoutError`` after a
+        10s default wait when the element is missing. Catching that here and
+        raising our typed error means agents see "not found" in ~2s instead
+        of waiting 10s and getting a raw TimeoutError.
+        """
+        try:
+            return await self._session.page.select(selector, timeout=timeout)
+        except asyncio.TimeoutError as exc:
+            raise ElementNotFoundError(selector) from exc
+
+    async def get_element_by_text(self, text: str, timeout: float = 2.0):
+        """Find element by visible text, typed error on miss, no 10s hang."""
+        try:
+            return await self._session.page.find(text, best_match=True, timeout=timeout)
+        except asyncio.TimeoutError as exc:
+            raise ElementNotFoundError(f"text='{text}'") from exc
+
+    async def try_select(self, selector: str, timeout: float = 2.0):
+        """Select an element, return ``None`` on miss instead of raising.
+
+        Use this when the upstream logic legitimately wants to branch on
+        presence (e.g. a visibility probe before clicking).
+        """
+        try:
+            return await self._session.page.select(selector, timeout=timeout)
+        except asyncio.TimeoutError:
+            return None
 
     async def run_js(self, script: str) -> Any:
         """execute JavaScript and return result"""

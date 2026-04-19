@@ -95,8 +95,8 @@ class UtilityTools(ToolBase):
 
         try:
             result = await self.run_js(script)
-            if result is None:
-                return "(no return value)"
+            # Distinguish JS ``undefined`` (zendriver returns ``None``) from
+            # legit ``null`` results: JSON round-tripping preserves both.
             return json.dumps(result, indent=2, default=str)
         except Exception as e:
             error_msg = str(e)

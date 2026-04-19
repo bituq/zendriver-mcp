@@ -1,11 +1,28 @@
 (function () {
   const ATTR = "data-zendriver-id";
+  // Per-run scope: each invocation picks a fresh prefix so two runs cannot
+  // accidentally collide on the same numeric id, even in edge cases where
+  // the cleanup pass below missed some shadow-rooted leftovers.
+  const RUN = Math.random().toString(36).slice(2, 8);
   let id = 1;
 
-  // Cleanup
-  document.querySelectorAll(`[${ATTR}]`).forEach(e => e.removeAttribute(ATTR));
+  // Shadow-aware cleanup: walk light + shadow DOM and strip any old ids.
+  function cleanup(root) {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    let n = w.currentNode;
+    while (n) {
+      if (n.hasAttribute && n.hasAttribute(ATTR)) n.removeAttribute(ATTR);
+      if (n.shadowRoot) cleanup(n.shadowRoot);
+      n = w.nextNode();
+    }
+  }
+  cleanup(document);
 
   const vh = window.innerHeight, vw = window.innerWidth;
+  const docHeight = Math.max(
+    document.documentElement.scrollHeight,
+    document.body ? document.body.scrollHeight : 0,
+  );
 
   function vis(el) {
     const s = getComputedStyle(el), r = el.getBoundingClientRect();
@@ -31,10 +48,12 @@
     if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
       if (el.type === "submit" || el.type === "button") return el.value || "";
 
-      // <label for="...">
+      // <label for="..."> - CSS.escape the id so weird ids like ":r1:" work
       if (el.id) {
-        const lbl = document.querySelector(`label[for="${el.id}"]`);
-        if (lbl) return lbl.innerText.trim();
+        try {
+          const lbl = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+          if (lbl) return lbl.innerText.trim();
+        } catch (_) { /* malformed id */ }
       }
 
       // Wrapped in label
@@ -107,7 +126,8 @@
     return "el";
   }
 
-  // Region detection (compact: 1-4 chars)
+  // Region detection (compact: 1-4 chars). Uses document-relative coords so
+  // scrolled-down elements aren't mis-tagged as footer.
   function rgn(el) {
     const c = el.closest("[role='banner'],header,[role='navigation'],nav,[role='main'],main,[role='contentinfo'],footer,aside,[role='complementary'],[role='dialog'],[aria-modal='true']");
     if (c) {
@@ -119,11 +139,13 @@
       if (r === "complementary" || t === "aside") return "side";
       if (r === "dialog" || c.getAttribute("aria-modal") === "true") return "dlg";
     }
-    // Heuristic
+    // Fallback heuristic - document-relative, not viewport-relative.
     const rect = el.getBoundingClientRect();
-    if (rect.top < 80) return "hdr";
-    if (rect.left < 200 && rect.top > 80) return "side";
-    if (rect.top > vh - 80) return "ftr";
+    const absTop = rect.top + window.scrollY;
+    const absLeft = rect.left + window.scrollX;
+    if (absTop < 80) return "hdr";
+    if (absLeft < 200 && absTop > 80) return "side";
+    if (docHeight && absTop > docHeight - 80) return "ftr";
     return "main";
   }
 
@@ -139,22 +161,26 @@
     return false;
   }
 
-  // Skip SVG internals and nested interactive children
+  // Skip SVG internals and nested interactive children. Walks up to the
+  // document root so deeply-nested wrappers like <a><div><div><svg>...</a>
+  // don't emit every layer as its own id.
   function skip(el, seen) {
     const tag = el.tagName.toLowerCase();
     if (["path", "use", "g", "circle", "rect", "line", "polygon", "svg", "defs", "clippath"].includes(tag)) return true;
 
-    // Skip if parent already captured
     let p = el.parentElement;
-    for (let i = 0; i < 3 && p; i++) {
+    while (p && p !== document.body) {
       if (seen.has(p)) return true;
       p = p.parentElement;
     }
     return false;
   }
 
+  // Walk the light DOM of `root`. Any shadow hosts we encounter get
+  // recursed into exactly once - we never TreeWalk through
+  // `root.shadowRoot` AND again via this recursion.
   function walk(root, out, seen) {
-    const w = document.createTreeWalker(root.shadowRoot || root, NodeFilter.SHOW_ELEMENT, {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, {
       acceptNode: n => vis(n) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
     });
 
@@ -168,7 +194,10 @@
         if (!label && t === "el") { n = w.nextNode(); continue; }
 
         const i = id++;
+        // Namespaced id keeps the numeric value stable for the agent
+        // while making cross-run collisions visible in the attribute.
         n.setAttribute(ATTR, i);
+        n.setAttribute("data-zendriver-run", RUN);
         seen.add(n);
 
         const o = { id: i, t: t, l: label || `[${n.tagName.toLowerCase()}]`, r: rgn(n) };
