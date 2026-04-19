@@ -6,6 +6,52 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+**Tool timeouts prevent session-killing hangs**
+- Every MCP tool now runs inside `asyncio.wait_for` with a configurable
+  budget (default 60s, or the `ZENDRIVER_MCP_TOOL_TIMEOUT` env var).
+  Slow tools get higher ceilings: `run_lighthouse` 300s,
+  `export_screencast_mp4` 300s, `take_heap_snapshot` 180s, `bypass_cloudflare`
+  120s, `get_accessibility_snapshot` 30s, etc. Before this a single hung
+  CDP command could freeze the stdio loop until the client disconnected,
+  tearing down the whole session. New `ToolTimeoutError` surfaces the
+  boundary with the tool name and budget.
+
+**Parser hangs on enum-version skew (root cause patch)**
+- Zendriver's CDP bindings hard-code enum members from the Chrome revision
+  they were generated against. When Chrome ships a new value (today's
+  offender: `AXPropertyName.uninteresting`) the generated `from_json`
+  raises `ValueError`, which propagates into `Transaction.__call__`,
+  which is driven by the Listener task, which silently swallows the error
+  and leaves the caller's future unresolved. Affected tools hang until
+  our timeout guard fires.
+- `src/compat.py` monkey-patches `Transaction.__call__` to convert *any*
+  parser exception into a future exception. Fail-fast with the real
+  error instead of a timeout. Imported with side effects inside
+  `src/session.py` so the patch is in place before the first CDP
+  round-trip. One patch immunises every tool against this class of bug.
+
+**`get_accessibility_snapshot` returned only the root node**
+- Two bugs in one flow. First the above parser hang. Then even with the
+  hang removed the render pass emitted only `RootWebArea` because real
+  Chrome puts an `ignored=true, role="none"` wrapper between the root
+  and the content, and the filter treated "ignored && not interactive"
+  as a hard prune.
+- Rewrote the render pass to treat skipped nodes as transparent: they
+  return their rendered children to the parent instead of becoming
+  dead-ends. Noise roles (`none`, `generic`, `presentation`,
+  `InlineTextBox`, `StaticText`) are recognised explicitly.
+  Interactive-role set expanded (`menuitemcheckbox`, `menuitemradio`,
+  `treeitem`). Root detected via `parentId is None`, not `raw_nodes[0]`.
+- AX snapshot for example.com now returns 5 nodes (RootWebArea,
+  heading, 2 paragraphs, link) in ~10 ms; previously it hung 30 s and
+  timed out.
+- `src/tools/accessibility.py` also bypasses zendriver's AX parser
+  entirely via a local `_raw_get_full_ax_tree` generator that returns
+  the CDP response dict verbatim. Safer than relying on the compat
+  patch alone.
+
 ### Added
 
 **Video export**
@@ -49,7 +95,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - `docs/tool-reference.md` updated to cover proxy, interception, and the
   new screencast tools.
 
-Tool count: 88 -> 96.
+Tool count: 88 -> 96. Test count: 24 -> 38.
 
 ## [0.2.0] - 2026-04-19
 
