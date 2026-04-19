@@ -11,11 +11,13 @@ from src.tools.elements import ElementTools
 from src.tools.emulation import EmulationTools
 from src.tools.forms import FormTools
 from src.tools.humanlike import HumanInputTools
+from src.tools.interception import InterceptionTools
 from src.tools.lighthouse import LighthouseTools
 from src.tools.logging import LoggingTools
 from src.tools.navigation import NavigationTools
 from src.tools.network_control import NetworkControlTools
 from src.tools.permissions import PermissionsTools
+from src.tools.proxy import ProxyTools
 from src.tools.query import QueryTools
 from src.tools.screencast import ScreencastTools
 from src.tools.stealth import StealthTools
@@ -47,6 +49,8 @@ _accessibility_tools = AccessibilityTools(mcp)
 _cookie_tools = CookieTools(mcp)
 _network_control_tools = NetworkControlTools(mcp)
 _permissions_tools = PermissionsTools(mcp)
+_proxy_tools = ProxyTools(mcp)
+_interception_tools = InterceptionTools(mcp)
 
 # export individual tool functions for backwards compatibility
 # browser lifecycle
@@ -154,6 +158,8 @@ check_lighthouse_available = _lighthouse_tools.check_lighthouse_available
 # screencast
 start_screencast = _screencast_tools.start_screencast
 stop_screencast = _screencast_tools.stop_screencast
+check_ffmpeg_available = _screencast_tools.check_ffmpeg_available
+export_screencast_mp4 = _screencast_tools.export_screencast_mp4
 
 # accessibility uids
 get_accessibility_snapshot = _accessibility_tools.get_accessibility_snapshot
@@ -176,6 +182,16 @@ bypass_service_worker = _network_control_tools.bypass_service_worker
 grant_permissions = _permissions_tools.grant_permissions
 reset_permissions = _permissions_tools.reset_permissions
 list_permission_names = _permissions_tools.list_permission_names
+
+# proxy
+configure_proxy = _proxy_tools.configure_proxy
+clear_proxy = _proxy_tools.clear_proxy
+
+# interception / mocking
+mock_response = _interception_tools.mock_response
+fail_requests = _interception_tools.fail_requests
+list_interceptions = _interception_tools.list_interceptions
+stop_interception = _interception_tools.stop_interception
 
 __all__ = [
     # mcp server
@@ -203,6 +219,8 @@ __all__ = [
     "CookieTools",
     "NetworkControlTools",
     "PermissionsTools",
+    "ProxyTools",
+    "InterceptionTools",
     # individual tool functions
     "start_browser",
     "stop_browser",
@@ -292,4 +310,12 @@ __all__ = [
     "grant_permissions",
     "reset_permissions",
     "list_permission_names",
+    "configure_proxy",
+    "clear_proxy",
+    "mock_response",
+    "fail_requests",
+    "list_interceptions",
+    "stop_interception",
+    "check_ffmpeg_available",
+    "export_screencast_mp4",
 ]

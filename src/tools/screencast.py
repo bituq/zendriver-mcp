@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import shutil
 import tempfile
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
 
 from mcp.server.fastmcp import FastMCP
 from zendriver import cdp
@@ -36,6 +39,8 @@ class ScreencastTools(ToolBase):
     def _register_tools(self) -> None:
         self._mcp.tool()(self.start_screencast)
         self._mcp.tool()(self.stop_screencast)
+        self._mcp.tool()(self.export_screencast_mp4)
+        self._mcp.tool()(self.check_ffmpeg_available)
 
     async def start_screencast(
         self,
@@ -118,4 +123,98 @@ class ScreencastTools(ToolBase):
             summary=f"Screencast stopped: {frames} frames in {directory}",
             data={"frame_count": frames, "format": self._frame_format},
             files=[str(directory)],
+        ).to_dict()
+
+    async def check_ffmpeg_available(self) -> dict[str, Any]:
+        """Report whether the ``ffmpeg`` CLI is installed. Required for
+        ``export_screencast_mp4``.
+        """
+        binary = shutil.which("ffmpeg")
+        if not binary:
+            return {
+                "available": False,
+                "hint": "Install with `brew install ffmpeg` / `apt install ffmpeg`.",
+            }
+        proc = await asyncio.create_subprocess_exec(
+            binary,
+            "-version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        out, _ = await proc.communicate()
+        first_line = out.decode().splitlines()[0] if out else ""
+        return {"available": True, "path": binary, "version": first_line}
+
+    async def export_screencast_mp4(
+        self,
+        frames_dir: str,
+        output_path: str = "",
+        fps: int = 30,
+    ) -> dict[str, Any]:
+        """Stitch screencast frames in ``frames_dir`` into an mp4.
+
+        Uses the default ``frame-%06d.jpg`` / ``frame-%06d.png`` pattern that
+        ``start_screencast`` writes. ``fps`` is the playback rate (not the
+        capture rate). Requires ffmpeg.
+        """
+        binary = shutil.which("ffmpeg")
+        if not binary:
+            raise ZendriverMCPError(
+                "ffmpeg not found. Install with `brew install ffmpeg` or `apt install ffmpeg`."
+            )
+
+        src = Path(frames_dir).expanduser().resolve()
+        if not src.is_dir():
+            raise ZendriverMCPError(f"frames_dir does not exist: {src}")
+
+        jpegs = list(src.glob("frame-*.jpg"))
+        pngs = list(src.glob("frame-*.png"))
+        if jpegs and not pngs:
+            pattern = str(src / "frame-%06d.jpg")
+            count = len(jpegs)
+        elif pngs:
+            pattern = str(src / "frame-%06d.png")
+            count = len(pngs)
+        else:
+            raise ZendriverMCPError(f"No frame-*.jpg or frame-*.png files found in {src}")
+
+        target = (
+            Path(output_path).expanduser().resolve()
+            if output_path
+            else Path(tempfile.gettempdir()) / f"zendriver-screencast-{int(time.time())}.mp4"
+        )
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        args = [
+            binary,
+            "-y",
+            "-framerate",
+            str(fps),
+            "-i",
+            pattern,
+            "-vf",
+            # Ensure even dimensions for yuv420p.
+            "pad=ceil(iw/2)*2:ceil(ih/2)*2",
+            "-c:v",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            str(target),
+        ]
+        proc = await asyncio.create_subprocess_exec(
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise ZendriverMCPError(f"ffmpeg failed ({proc.returncode}): {stderr.decode()[:500]}")
+
+        size = target.stat().st_size
+        return ToolResponse(
+            summary=f"Encoded {count} frames -> {target} ({size // 1024} KiB)",
+            data={"frame_count": count, "fps": fps, "size_bytes": size},
+            files=[str(target)],
         ).to_dict()

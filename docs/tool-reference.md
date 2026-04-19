@@ -1,6 +1,6 @@
 # Tool reference
 
-88 tools across 19 modules. Full signatures live in the module docstrings
+96 tools across 22 modules. Full signatures live in the module docstrings
 (`src/tools/*.py`); this page is a flat catalogue.
 
 ## Browser lifecycle (`browser.py`)
@@ -99,6 +99,8 @@ the `cookies` module.
 
 - `start_screencast(output_dir, fmt, quality, max_width, every_nth_frame)`
 - `stop_screencast()`
+- `export_screencast_mp4(frames_dir, output_path, fps)` - stitch frames via ffmpeg
+- `check_ffmpeg_available()`
 
 ## Accessibility (`accessibility.py`)
 
@@ -124,3 +126,21 @@ CDP-level; sees HTTP-only cookies and all origins.
 - `grant_permissions(permissions, origin)`
 - `reset_permissions()`
 - `list_permission_names()`
+
+## Proxy (`proxy.py`)
+
+Browser proxy is set at launch via `--proxy-server`, so these tools restart
+the browser. Session state in a `user_data_dir` survives the restart.
+
+- `configure_proxy(proxy_url, user_data_dir, headless)`
+- `clear_proxy(user_data_dir, headless)`
+
+## Interception (`interception.py`)
+
+`Fetch.enable`-powered mocking and blocking. More flexible than
+`block_urls` - arbitrary status + body + headers.
+
+- `mock_response(url_pattern, status, body, headers)` - returns `rule_id`
+- `fail_requests(url_pattern, error_reason)` - returns `rule_id`
+- `list_interceptions()`
+- `stop_interception(rule_id)` - omit for clear-all

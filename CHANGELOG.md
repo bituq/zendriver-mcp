@@ -4,6 +4,53 @@ All notable changes to this project will be documented here.
 Format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+**Video export**
+- `export_screencast_mp4(frames_dir, output_path, fps)`: stitch screencast
+  frames into an mp4 via ffmpeg. Uses libx264 + yuv420p + `+faststart`
+  so the output plays in browsers and QuickTime without re-encoding.
+- `check_ffmpeg_available()` surfaces whether the CLI is installed.
+
+**Request interception / mocking**
+- New `InterceptionTools` module backed by `Fetch.enable` + a persistent
+  `requestPaused` handler.
+- `mock_response(url_pattern, status, body, headers)` returns a rule id;
+  every matching request gets the mocked response.
+- `fail_requests(url_pattern, error_reason)` drops matching requests with
+  a CDP `Network.ErrorReason` value (e.g. `BlockedByClient`,
+  `InternetDisconnected`, `TimedOut`).
+- `list_interceptions()` and `stop_interception(rule_id?)` manage rules.
+- Each rule tracks a `match_count` so tests can assert "this mock fired".
+
+**Proxy**
+- `configure_proxy(proxy_url, user_data_dir, headless)` and
+  `clear_proxy(...)`. Chrome can't swap proxies at runtime so we restart
+  the browser; pass a `user_data_dir` to preserve the logged-in session.
+
+**PyPI release workflow**
+- `.github/workflows/publish.yml`: on `v*` tag push, builds sdist + wheel
+  with `uv build` and publishes via Trusted Publishing (OIDC, no API
+  tokens needed on the repo side).
+- `docs/releasing.md` walks through PyPI pending-publisher setup, cutting
+  a release, and the manual fallback.
+
+**ToolResponse adoption**
+- `BrowserTools.get_browser_status`, `NavigationTools.get_page_info`, and
+  `TabTools.list_tabs` now return the `ToolResponse` envelope
+  (`{"summary", "data"}`) so agents can programmatically inspect state
+  instead of parsing strings.
+
+**Docs**
+- `docs/recipes/mock-api-responses.md` covers `mock_response`,
+  `fail_requests`, and rule management.
+- `docs/tool-reference.md` updated to cover proxy, interception, and the
+  new screencast tools.
+
+Tool count: 88 -> 96.
+
 ## [0.2.0] - 2026-04-19
 
 ### Added

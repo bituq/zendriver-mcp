@@ -1,5 +1,8 @@
 # browser lifecycle tools - start, stop, status
 
+from typing import Any
+
+from src.response import ToolResponse
 from src.tools.base import ToolBase
 
 
@@ -17,8 +20,6 @@ class BrowserTools(ToolBase):
     ) -> str:
         """Start the browser with configuration options."""
         await self.session.start(headless=headless, proxy=proxy, user_data_dir=user_data_dir)
-
-        # build response message
         mode = "headless" if headless else "headed"
         extras = []
         if proxy:
@@ -33,14 +34,17 @@ class BrowserTools(ToolBase):
         await self.session.stop()
         return "Browser stopped and all resources cleaned up"
 
-    async def get_browser_status(self) -> str:
-        """Get current browser status and session info."""
+    async def get_browser_status(self) -> dict[str, Any]:
+        """Return browser running state plus a list of open tabs."""
         if not self.session.is_browser_started():
-            return "Browser: Not started"
+            return ToolResponse(summary="Browser: Not started", data={"running": False}).to_dict()
 
-        # list all open tabs
         tabs = self.session.get_all_tabs()
-        lines = ["Browser: Running", f"Open tabs: {len(tabs)}"]
-        for tab_id, url in tabs.items():
-            lines.append(f"  - {tab_id}: {url}")
-        return "\n".join(lines)
+        return ToolResponse(
+            summary=f"Browser running with {len(tabs)} tab(s)",
+            data={
+                "running": True,
+                "tab_count": len(tabs),
+                "tabs": [{"id": tid, "url": url} for tid, url in tabs.items()],
+            },
+        ).to_dict()

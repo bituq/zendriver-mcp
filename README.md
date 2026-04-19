@@ -15,8 +15,8 @@ that looks like an ordinary Chrome install.
 On top of that foundation, `zendriver-mcp` layers everything an agent needs
 to get work done: a token-efficient DOM walker, an accessibility tree with
 stable uids, performance traces, Lighthouse audits, heap snapshots, human-like
-input, device emulation, cookie round-tripping, and more - **88 tools across
-19 modules**.
+input, device emulation, cookie round-tripping, and more - **96 tools across
+22 modules**.
 
 ## Highlights
 
@@ -60,6 +60,9 @@ input, device emulation, cookie round-tripping, and more - **88 tools across
 | `cookies` | export / import / list / clear (CDP-level, all origins) |
 | `network_control` | block URLs, extra headers, bypass service worker |
 | `permissions` | grant / reset, list names |
+| `proxy` | configure / clear (restarts browser with proxy args) |
+| `interception` | mock_response, fail_requests, list, stop |
+| `screencast` | + export_screencast_mp4, check_ffmpeg_available |
 
 Full signatures live in the docstrings of `src/tools/*.py` and are auto-listed
 by the MCP handshake.
@@ -158,12 +161,25 @@ CI runs the same four on every push and PR.
 
 ## Roadmap
 
-- Full `McpResponse` adoption across all legacy tools (phase-3 envelope is
-  opt-in for now)
-- Video export (`.mp4`) via ffmpeg from the screencast frames
-- Request interception and response rewriting (`Fetch.enable`)
-- Proxy configuration tool
-- `uv` / PyPI publication
+Everything on the original roadmap shipped in the 0.2 / 0.3 releases:
+
+- [x] Stealth: Cloudflare solver, UA / locale / timezone / geolocation
+- [x] Human-like input: bezier mouse paths, gaussian keystroke timing
+- [x] DevTools parity: traces, heap snapshots, Lighthouse
+- [x] Screencast + mp4 export via ffmpeg
+- [x] Accessibility tree with stable uids
+- [x] Cookie import/export, blocking, extra headers, permissions
+- [x] Request interception + response mocking (`Fetch.enable`)
+- [x] Proxy configuration (restart with `--proxy-server`)
+- [x] `ToolResponse` envelope adopted in rich-output tools
+- [x] PyPI publish workflow (Trusted Publishing)
+
+What's next is driven by actual usage. Ideas on deck:
+
+- Per-request proxy routing via Fetch interception
+- Binary body support in `mock_response`
+- `Fetch.enable` with patterns (faster than our "match all then filter")
+- Docs site hosted from `/docs/`
 
 ## License
 
