@@ -140,9 +140,7 @@ class QueryTools(ToolBase):
         import json as _json
 
         needle = _json.dumps(filter_text or "")
-        buttons = await self.run_js(
-            COLLECT_INTERACTIVES_JS + f"\ncollectButtons({needle})\n"
-        )
+        buttons = await self.run_js(COLLECT_INTERACTIVES_JS + f"\ncollectButtons({needle})\n")
 
         if not buttons:
             return "No buttons found" + (f" matching '{filter_text}'" if filter_text else "")
