@@ -12,7 +12,8 @@ dist/
 # Env / config
 .env
 .claude
-.mcp.json
+# NOTE: .mcp.json is committed on purpose - it holds the project-scope
+# `zendriver-dev` MCP registration (relative command, no secrets).
 
 # OS
 .DS_Store

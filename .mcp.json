@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "zendriver-dev": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "zendriver-mcp"
+      ],
+      "env": {}
+    }
+  }
+}
