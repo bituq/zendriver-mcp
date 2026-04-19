@@ -7,6 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [Unreleased]
 
 ### Fixed
+- `click(text=...)` and `human_click(text=...)` now normalize the
+  picked candidate to the nearest `<a>`/`<button>`/`[role=link]`/
+  `[role=button]` ancestor via `closest()` before dispatching. A
+  `<span>` icon inside an `<a>` often wins the "tightest text match"
+  race and passes `isClickableEl` through `cursor: pointer`, but
+  synthetic events on that inner span don't trigger the link's
+  default navigation. On the Azure signup page the text click now
+  actually follows the CTA.
 - `click(text=...)`, `click_shadow`, `describe_shadow`,
   `human_click(text=...)`, `find_buttons` and `find_inputs` no longer
   throw `SyntaxError: Illegal return statement` on first call, nor

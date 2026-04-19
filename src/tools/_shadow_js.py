@@ -157,6 +157,17 @@ function clickByTextShadow(target) {
   }
   if (!pick) pick = candidates[0];
 
+  // Normalize to the nearest real navigable ancestor. A <span>/icon
+  // inside an <a> often matches isClickableEl via cursor:pointer, and
+  // dispatching events on that inner element never fires the <a>'s
+  // default navigation. closest() climbs to the owning link/button
+  // within the current (light or shadow) DOM context and gives us a
+  // target whose .click() actually navigates.
+  if (pick && typeof pick.closest === "function") {
+    const navigable = pick.closest("a, button, [role='link'], [role='button']");
+    if (navigable) pick = navigable;
+  }
+
   // If the pick is a custom element host, dive into its shadow DOM chain
   // until we hit a leaf-level clickable (button, role=radio, etc.).
   const inner = findInnerClickable(pick, 5);
@@ -239,6 +250,13 @@ function findClickCoordsByText(target) {
     if (pick) break;
   }
   if (!pick) pick = candidates[0];
+
+  // Normalize to the nearest real navigable ancestor so the cursor
+  // lands on the <a>/<button>'s rect instead of an inner icon span.
+  if (pick && typeof pick.closest === "function") {
+    const navigable = pick.closest("a, button, [role='link'], [role='button']");
+    if (navigable) pick = navigable;
+  }
 
   // Dive into shadow DOM for the real interactive leaf (e.g. the inner
   // <button> of a <nes-button>). Coords come from that element's rect
