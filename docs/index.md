@@ -38,11 +38,15 @@ Agents that try to work on the real web hit bot walls immediately.
 [:material-rocket-launch: Getting started](getting-started.md){ .md-button .md-button--primary }
 [:material-book-open: Tool reference](tool-reference.md){ .md-button }
 
+Published on [PyPI](https://pypi.org/project/zendriver-mcp/) and the
+[MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=zendriver)
+as `io.github.bituq/zendriver-mcp`.
+
 ```sh
-git clone https://github.com/bituq/zendriver-mcp.git
-cd zendriver-mcp
-uv sync
-uv run zendriver-mcp
+uvx zendriver-mcp            # zero-setup, re-resolves every run
+uv tool install zendriver-mcp  # install once, invoke many
+pipx install zendriver-mcp
+pip install zendriver-mcp
 ```
 
 Hook it up to Claude Desktop / Code in one JSON block:
@@ -51,13 +55,8 @@ Hook it up to Claude Desktop / Code in one JSON block:
 {
   "mcpServers": {
     "zendriver": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/zendriver-mcp",
-        "run",
-        "zendriver-mcp"
-      ]
+      "command": "uvx",
+      "args": ["zendriver-mcp"]
     }
   }
 }
